@@ -20,7 +20,7 @@ def smallest_D(
     q: float,
     delta_f: float,
     D_max: int = 500,
-    D_precision: float = 1.0,
+    D_precision: float = 0.1,
     c_target: float = 0.0,
     num_grid: int = 50,
     feasibility_check=None,

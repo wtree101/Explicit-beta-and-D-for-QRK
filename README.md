@@ -2,7 +2,8 @@
 
 Minimal self-contained code (`adv_D_upper`) for computing the **upper bound on
 the subsample size D** in Quantile-based Randomized Kaczmarz (QRK) under
-**adversarial Massart noise** and **random noise**.
+**adversarial Massart noise**, **fixed noise (supremum over C)**, and
+**Gaussian oblivious noise (supremum over σ)**.
 
 ---
 
@@ -61,6 +62,8 @@ This prints the smallest D for a single example and saves
 
 ```python
 from qrk_adv.upper_bound import smallest_D
+from functools import partial
+from qrk_adv.feasibility import check_feasibility_conditions_random_sup_revised
 
 result = smallest_D(
     beta    = 0.05,    # corruption fraction
@@ -75,6 +78,55 @@ result = smallest_D(
 print(result["smallest_D"])   # smallest feasible D
 print(result["c"])             # net contraction coefficient c
 print(result["failure_prob"])  # actual failure probability
+```
+
+To use the Gaussian worst-sigma check with explicit grid sizes:
+
+```python
+from qrk_adv.feasibility import check_feasibility_conditions_random_sup_revised
+
+gaussian_check = partial(
+  check_feasibility_conditions_random_sup_revised,
+  num_grid_Q=20,
+  num_points_C=50,
+)
+
+result = smallest_D(
+  beta=0.05,
+  T=20_000,
+  q=0.75,
+  delta_f=0.1,
+  D_max=500,
+  c_target=0.0,
+  feasibility_check=gaussian_check,
+)
+```
+
+To use the **fixed-noise supremum-over-C** check (oblivious worst-case magnitude):
+
+```python
+from qrk_adv.feasibility import check_feasibility_conditions_C_sup_revised
+
+fixed_C_check = partial(
+  check_feasibility_conditions_C_sup_revised,
+  num_grid_Q=2,       # Q_{q,k+1} sweep; 1 often suffices if c increases in q
+  C_min=0.0,
+  C_max=20.0,
+  num_points_C=20,    # grid for sup_C error_increased_C_3
+)
+
+result = smallest_D(
+  beta=0.05,
+  T=20_000,
+  q=0.75,
+  delta_f=0.1,
+  D_max=500,
+  c_target=0.0,
+  feasibility_check=fixed_C_check,
+)
+
+# Revised checks return c_min (not c); smallest_D maps it to result["c"].
+print(result["c"], result.get("smallest_D"))
 ```
 
 ### Parameters
@@ -97,7 +149,7 @@ print(result["failure_prob"])  # actual failure probability
 | `smallest_D`   | Smallest feasible D (None if infeasible within D_max) |
 | `alpha_0`      | Optimal lower slack parameter |
 | `alpha_prime`  | Optimal upper slack parameter |
-| `c`            | Net contraction at optimum |
+| `c`            | Net contraction at optimum (`c` or `c_min` from the check) |
 | `failure_prob` | Actual failure probability 1 - (1-p_u)^T |
 | `hit_ceiling`  | True if result == D_max (increase D_max) |
 
@@ -117,12 +169,24 @@ The two conditions verified at each candidate D are:
 
 ---
 
+## Feasibility checks in `qrk_adv.feasibility`
+
+| Function | Noise model |
+|----------|-------------|
+| `check_feasibility` | Adversarial Massart (preliminary) |
+| `check_feasibility_conditions_C_sup_revised` | Fixed magnitude C; sup over `[C_min, C_max]` at each conditional quantile |
+| `check_feasibility_conditions_random_sup_revised` | Gaussian C ~ N(0, σ²); sup over `[sigma_min, sigma_max]` |
+
+Custom checks must accept `(T, beta, D, q, alpha_0, alpha_prime, delta_f, c_target=...)`
+and return a dict with `feasible`, plus `c` or `c_min` when feasible.
+
+---
+
 ## Notes
 
 - The default feasibility check is the preliminary adversarial analysis.
-  You can pass a custom check via `feasibility_check` to use other models
-  (e.g., fixed-noise or Gaussian worst-sigma variants added in
-  `qrk_adv.feasibility`).
+  Pass a custom check via `feasibility_check` (typically `functools.partial`)
+  for the fixed-C or Gaussian supremum variants in `qrk_adv.feasibility`.
 - Feasibility requires `β < min(q, 1-q)`.  Near this boundary D grows
   rapidly; increase `D_max` as needed.
 - The `c_target` parameter can be used to study robustness: a larger

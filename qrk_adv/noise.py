@@ -2,11 +2,10 @@ import numpy as np
 from functools import lru_cache
 from scipy.integrate import quad
 from scipy.stats import norm
+from .debug import debug_log
 
 # Module: error-increase utilities for fixed and Gaussian noise.
 
-
-@lru_cache(maxsize=8192)
 def error_increased_C_3(qq: float, C: float) -> float:
     """Error increase for fixed noise C using a tighter integration region.
 
@@ -66,11 +65,11 @@ def find_C_with_largest_error_increase_fast(
     max_idx = int(np.argmax(errors))
     C_largest = C_grid[max_idx]
     max_error = errors[max_idx]
-    print(f"Largest error increased for q={qq}: C={C_largest:.4f}, error={max_error:.4f}")
+    debug_log(f"Largest error increased for q={qq}: C={C_largest:.4f}, error={max_error:.4f}")
     return C_largest, max_error
 
 
-@lru_cache(maxsize=4096)
+
 def error_increased_Gaussian_noise(qq: float, sigma: float) -> float:
     """Expected error increase when noise C ~ N(0, sigma^2)."""
     if sigma <= 0:
@@ -98,4 +97,6 @@ def find_sigma_with_largest_error_increase_fast(
     sigma_grid = np.linspace(sigma_min, sigma_max, num_points)
     errors = [error_increased_Gaussian_noise(qq=qq, sigma=s) for s in sigma_grid]
     max_idx = int(np.argmax(errors))
+    debug_log(f"sigma_grid errors: {errors}")
+    debug_log(f"Largest error increased for phiq={qq}: sigma={sigma_grid[max_idx]:.4f}, error={errors[max_idx]:.4f}")
     return sigma_grid[max_idx], errors[max_idx]

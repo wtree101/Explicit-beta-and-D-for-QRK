@@ -25,12 +25,10 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from functools import partial
 
 from qrk_adv.upper_bound import smallest_D
 from qrk_adv.feasibility import check_feasibility
 from qrk_adv.feasibility import check_feasibility_conditions_random_sup_revised
-from qrk_adv.feasibility import check_feasibility_conditions_C_sup_revised
 from qrk_adv import set_debug
 
 #set_debug(True)   # 打开调试输出
@@ -41,30 +39,18 @@ set_debug(False)  # 关闭调试输出
 T       = 20_000   # number of QRK iterations
 Q       = 0.6     # quantile level
 DELTA_F = 0.1      # allowed total failure probability
-D_MAX   = 50000      # search ceiling; increase if result hits ceiling
+D_MAX   = 10000      # search ceiling; increase if result hits ceiling
 c_target = 0.01
-NUM_GRID_Q = 2    # grid size for conditional-quantile sweep (Gaussian check)
-NUM_POINTS_C = 20  # grid size for sigma sweep (Gaussian check)
 # FEASIBILITY_CHECK = check_feasibility
-# FEASIBILITY_CHECK = partial(
-#     check_feasibility_conditions_C_sup_revised,
-#     num_grid_Q=NUM_GRID_Q,
-#     C_min=0.0,
-#     C_max=20.0,
-#     num_points_C=NUM_POINTS_C,
-# )
-FEASIBILITY_CHECK = partial(
-    check_feasibility_conditions_random_sup_revised,
-    num_grid_Q=NUM_GRID_Q,
-    num_points_C=NUM_POINTS_C,
-)
+FEASIBILITY_CHECK = check_feasibility_conditions_random_sup_revised
 VERBOSE = True
+NUM_POINTS_LIST = [1, 2, 10, 50]
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def single_example():
     """Print the smallest D for one (beta, T, q, delta_f) setting."""
-    beta = 0.30
+    beta = 0.2
 
     print("=" * 60)
     print(f"  Computing smallest feasible D")
@@ -155,6 +141,80 @@ def sweep_and_plot():
     plt.close(fig)
 
 
+def sweep_and_plot_num_points():
+    """Sweep beta and compare D_upper across sigma grid sizes."""
+    beta_min, beta_max, n_pts = 0.25, 0.34, 3
+
+    # Space betas so 1/log(1/beta) is uniform (denser near 0).
+    inv_log = np.linspace(1 / np.log(1 / beta_min),
+                          1 / np.log(1 / beta_max), n_pts)
+    betas = np.exp(-1 / inv_log)
+
+    def make_feasibility(num_points: int):
+        def _check(T, beta, D, q, alpha_0, alpha_prime, delta_f, c_target=0.0):
+            return check_feasibility_conditions_random_sup_revised(
+                T,
+                beta,
+                D,
+                q,
+                alpha_0,
+                alpha_prime,
+                delta_f,
+                num_grid=1,  # no grid sweep over q_cond; just evaluate at the given q,
+                sigma_min=0.01,
+                sigma_max=10.0,
+                num_points=num_points,
+                c_target=c_target,
+            )
+        return _check
+
+    curves = {}
+    for num_points in NUM_POINTS_LIST:
+        print(f"\n=== Sweeping betas for num_points={num_points} ===")
+        D_upper = []
+        feasibility_check = make_feasibility(num_points)
+        for idx, b in enumerate(betas, start=1):
+            if VERBOSE:
+                print(f"[{idx}/{len(betas)}] beta={b:.6g} ...")
+            res = smallest_D(
+                b,
+                T,
+                Q,
+                DELTA_F,
+                D_max=D_MAX,
+                c_target=c_target,
+                feasibility_check=feasibility_check,
+            )
+            D_upper.append(
+                res["smallest_D"] if res["smallest_D"] is not None else np.nan
+            )
+            if VERBOSE:
+                print(f"  -> smallest_D={D_upper[-1]}")
+        curves[num_points] = np.array(D_upper, dtype=float)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    for num_points, D_upper in curves.items():
+        ax.plot(betas, D_upper, "o-", lw=1.4, label=f"num_points={num_points}")
+
+    ax.set_xlabel(r"$\beta$  (corruption fraction)", fontsize=12)
+    ax.set_ylabel("Required subsample size $D$", fontsize=12)
+    ax.set_title(
+        f"Upper bound on $D$ vs $\\beta$ (sigma grid sweep)\n"
+        f"($T={T},\; q={Q},\; \delta_f={DELTA_F}$)",
+        fontsize=12,
+    )
+    ax.set_yscale("log")
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    out = "figure/demo_D_vs_beta_sigma_grid_sweep.png"
+    fig.savefig(out, dpi=150)
+    print(f"Figure saved to {out}")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
-    single_example()
+    #single_example()
     # sweep_and_plot()
+    sweep_and_plot_num_points()

@@ -86,6 +86,7 @@ def find_alpha_pair(
         
 
     alpha_prime = ap_lo
+    # print(f"p_u_max: {p_u_max}, alpha_prime: {alpha_prime}")
     # print(f"alpha_prime: {alpha_prime}")
     # Step 2: grid-search over alpha_0
     if feasibility_check is None:
