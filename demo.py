@@ -39,12 +39,12 @@ set_debug(False)  # 关闭调试输出
 
 # ── shared parameters ─────────────────────────────────────────────────────────
 T       = 20_000   # number of QRK iterations
-Q       = 0.6     # quantile level
+Q       = 0.75     # quantile level
 DELTA_F = 0.1      # allowed total failure probability
 D_MAX   = 50000      # search ceiling; increase if result hits ceiling
-c_target = 0.01
-NUM_GRID_Q = 2    # grid size for conditional-quantile sweep (Gaussian check)
-NUM_POINTS_C = 20  # grid size for sigma sweep (Gaussian check)
+c_target = 0.00
+NUM_GRID_Q = 4    # grid size for conditional-quantile sweep (Gaussian check)
+NUM_POINTS_C = 40  # grid size for sigma sweep (Gaussian check)
 # FEASIBILITY_CHECK = check_feasibility
 # FEASIBILITY_CHECK = partial(
 #     check_feasibility_conditions_C_sup_revised,
@@ -54,7 +54,7 @@ NUM_POINTS_C = 20  # grid size for sigma sweep (Gaussian check)
 #     num_points_C=NUM_POINTS_C,
 # )
 FEASIBILITY_CHECK = partial(
-    check_feasibility_conditions_random_sup_revised,
+    check_feasibility_conditions_C_sup_revised,
     num_grid_Q=NUM_GRID_Q,
     num_points_C=NUM_POINTS_C,
 )
@@ -64,7 +64,7 @@ VERBOSE = True
 
 def single_example():
     """Print the smallest D for one (beta, T, q, delta_f) setting."""
-    beta = 0.30
+    beta = 0.01
 
     print("=" * 60)
     print(f"  Computing smallest feasible D")
