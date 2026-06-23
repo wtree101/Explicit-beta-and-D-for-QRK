@@ -1,0 +1,10 @@
+# D_min computation for testing
+find_D_min_D_vs_beta.py
+find_D_min_D_vs_T.py
+
+# All MATLAB tmp files
+*.asv
+
+# Data folders
+q_e/
+heat_map_raw_data/

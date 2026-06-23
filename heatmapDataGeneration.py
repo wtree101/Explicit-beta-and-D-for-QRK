@@ -210,10 +210,12 @@ def generate_heat_map_matrix(
                 case "sup_rand":
                     feasibility_check = partial(check_feasibility_conditions_random_sup_revised,num_grid_Q=20,num_points_C=50)
             for i in tqdm(range(len(beta_samples))):
-                D_min_vals[i] = smallest_D(beta_samples[i], T_max, q, D_max=D_max, delta_f=delta_f, c_target=c)["smallest_D"]
+                D_min_vals[i] = smallest_D(beta_samples[i], T_max, q, D_max=D_max, delta_f=delta_f, c_target=c, feasibility_check=feasibility_check)["smallest_D"]
             save_heat_map_matrix(D_vs_TYPE="D_vs_beta",data_type="D_min",mean_success=np.matrix(D_min_vals),n=n,D_sample_sizes=D_sample_sizes,num_samples=num_samples,T_max=T_max,q=q,c=c,corruption_type=corruption_type,beta_samples=beta_samples)
             save_heat_map_matrix(D_vs_TYPE="D_vs_beta",data_type="D_samples",mean_success=np.matrix(D_sample_sizes).T,n=n,D_sample_sizes=D_sample_sizes,num_samples=num_samples,T_max=T_max,q=q,c=c,corruption_type=corruption_type,beta_samples=beta_samples)
             save_heat_map_matrix(D_vs_TYPE="D_vs_beta",data_type="beta_samples",mean_success=np.matrix(beta_samples).T,n=n,D_sample_sizes=D_sample_sizes,num_samples=num_samples,T_max=T_max,q=q,c=c,corruption_type=corruption_type,beta_samples=beta_samples)
+
+            print(np.array2string(np.matrix(D_min_vals)))
 
             print(f"""Variables:
             \tn:\t\t\t{n}
@@ -252,7 +254,7 @@ def save_heat_map_matrix(
             filename1 = "D_vs_beta"
             match data_type:
                 case "D_min":
-                    filename2 = "__D_MIN"
+                    filename2 = "__D_min"
                 case "D_samples":
                     filename2 = "__D_samples"
                 case "beta_samples":

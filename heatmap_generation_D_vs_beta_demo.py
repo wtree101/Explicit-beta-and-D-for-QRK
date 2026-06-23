@@ -22,11 +22,11 @@ if __name__ == '__main__':
     # Algorithm parameters
     q = 0.8
     beta_samples = (np.arange(21))*0.001
-    D_sample_sizes = (np.arange(30))*2+1
-    T_max = 10_000
+    D_sample_sizes = (np.arange(30))+1
+    T_max = 20_000
 
     # Sampling Parameters
-    num_samples = 5
+    num_samples = 100
 
     # Success-quantification parameters
     c = 0.001

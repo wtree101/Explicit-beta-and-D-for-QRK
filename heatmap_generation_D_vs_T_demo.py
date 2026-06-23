@@ -17,14 +17,14 @@ if __name__ == '__main__':
 
     # Algorithm parameters
     q = 0.8
-    beta = 0.01
+    beta = 0.005
     D_sample_sizes = np.arange(30)+1
     T_intervals = 100
-    T_max = 10_000
+    T_max = 20_000
 
     # Sampling Parameters
-    num_samples = 5
-    corruption_type = "sup_c"
+    num_samples = 100
+    corruption_type = "adversarial"
 
     # Min D parameters
     c = 0.001
