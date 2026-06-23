@@ -13,8 +13,9 @@ corruption_type = 'adversarial';
 beta = floor(beta*100) / 100;
 
 % Load and display heat map
-filename_heat_map = sprintf('\\heat_map_raw_data\\D_vs_T__n=%u__q=%u__beta=%u__D_min=%u__D_max=%u__c=%1.0d__num_samples=%u__T_intervals=%u__T_max=%u__corruption_type=%s.txt',n,q*100,beta*100,D_min,D_max,c,num_samples,T_intervals,T_max,corruption_type);
-filename_D_min_vals = sprintf('\\heat_map_raw_data\\D_vs_T__D_MIN__n=%u__q=%u__beta=%u__D_min=%u__D_max=%u__c=%1.0d__num_samples=%u__T_intervals=%u__T_max=%u__corruption_type=%s.txt',n,q*100,beta*100,D_min,D_max,c,num_samples,T_intervals,T_max,corruption_type);
+filename = sprintf('__n=%u__q=%u__beta=%u__D_min=%u__D_max=%u__c=%1.0d__num_samples=%u__T_intervals=%u__T_max=%u__corruption_type=%s.txt',n,q*100,beta*100,D_min,D_max,c,num_samples,T_intervals,T_max,corruption_type);
+filename_heat_map = sprintf('..\\heat_map_raw_data\\D_vs_T%s',filename);
+filename_D_min_vals = sprintf('..\\heat_map_raw_data\\D_vs_T__D_MIN%s',filename);
 A=readmatrix(filename_heat_map);
 D_min_vals=readmatrix(filename_D_min_vals);
 
