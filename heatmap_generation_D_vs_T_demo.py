@@ -1,4 +1,4 @@
-from heatmapDataGeneration import generate_heat_map_matrix
+from heatmap_data_generation.heatmapDataGeneration import generate_heat_map_matrix
 import numpy as np
 
 if __name__ == '__main__':
@@ -18,12 +18,12 @@ if __name__ == '__main__':
     # Algorithm parameters
     q = 0.8
     beta = 0.005
-    D_sample_sizes = np.arange(30)+1
+    D_sample_sizes = np.arange(15)+1
     T_intervals = 100
-    T_max = 20_000
+    T_max = 10_000
 
     # Sampling Parameters
-    num_samples = 100
+    num_samples = 2
     corruption_type = "adversarial"
 
     # Min D parameters

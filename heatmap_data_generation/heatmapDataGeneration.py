@@ -10,6 +10,7 @@ from functools import partial
 from qrk_adv.feasibility import check_feasibility_conditions_random_sup_revised
 from qrk_adv.feasibility import check_feasibility_conditions_C_sup_revised
 from itertools import product
+import os
 
 
 def streaming_subsampled_qRK_step(
@@ -272,7 +273,9 @@ def save_heat_map_matrix(
                 case "":
                     filename2 = ""
             filename3 = f"__n={n}__q={q*100:2.0f}__beta={beta*100:.0f}__D_min={np.min(D_sample_sizes)}__D_max={np.max(D_sample_sizes)}__c={c:1.0e}__num_samples={num_samples}__T_intervals={T_intervals}__T_max={T_max}__corruption_type={corruption_type}.txt"    
+            # fullfilename = os.path.join(os.pardir, filepath + filename1 + filename2 + filename3)
             fullfilename = filepath + filename1 + filename2 + filename3
+            print(fullfilename)
 
     with open(fullfilename,'wb') as f:
         for line in mean_success_mat:
