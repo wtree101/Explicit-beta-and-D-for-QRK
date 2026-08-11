@@ -216,8 +216,7 @@ relative_error <= (1 - c / n)^T
 
 This gives a uniform target rate across all `(D,T)` cells, so the success
 probabilities are easy to compare.  However, it can saturate for large `D`,
-because once `D` is large enough to meet the fixed target rate, increasing `D`
-does not make the success criterion stricter.
+because larger `D` produces larger `c`, and make the experiment easy to success.
 
 ```python
 c_success_mode = "bound"
@@ -235,16 +234,6 @@ as the success criterion.  With `maximize_c_for_success = True`, the code
 searches over all feasible `alpha_0` grid points and uses the largest
 certified `c`.  This is stricter for large `D` and can better show the
 relationship between `D` and `T`.
-
-To reproduce the earlier bound-based mode that stops at the first feasible
-`alpha_0`, set:
-
-```python
-maximize_c_for_success = False
-```
-
-When `c_success_mode = "bound"`, the generator also saves a `c_bound` matrix
-showing the `c(D,T)` values used for the success judgement.
 
 ---
 
