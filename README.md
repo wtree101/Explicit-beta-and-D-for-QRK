@@ -227,7 +227,7 @@ uses a cell-wise certified contraction coefficient.  For each heatmap cell,
 the code computes a feasible bound-derived `c(D,T)` and uses
 
 ```text
-relative_error <= (1 - c(D) / n)^T
+relative_error <= (1 - c(D,T) / n)^T
 ```
 
 as the success criterion.  With `maximize_c_for_success = True`, the code
