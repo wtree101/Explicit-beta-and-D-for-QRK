@@ -53,11 +53,13 @@ NUM_POINTS_C = 40  # grid size for sigma sweep (Gaussian check)
 #     C_max=20.0,
 #     num_points_C=NUM_POINTS_C,
 # )
+# FEASIBILITY_CHECK = partial(
+#     check_feasibility_conditions_C_sup_revised,
+#     num_grid_Q=NUM_GRID_Q,
+#     num_points_C=NUM_POINTS_C,
+# )
 FEASIBILITY_CHECK = partial(
-    check_feasibility_conditions_C_sup_revised,
-    num_grid_Q=NUM_GRID_Q,
-    num_points_C=NUM_POINTS_C,
-)
+    check_feasibility)
 VERBOSE = True
 # ─────────────────────────────────────────────────────────────────────────────
 

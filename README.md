@@ -180,6 +180,25 @@ The two conditions verified at each candidate D are:
 Custom checks must accept `(T, beta, D, q, alpha_0, alpha_prime, delta_f, c_target=...)`
 and return a dict with `feasible`, plus `c` or `c_min` when feasible.
 
+## Heatmap `corruption_type` values
+
+The heatmap demo scripts use a string-valued `corruption_type` to select the
+simulation noise model and the matching feasibility check:
+
+| `corruption_type` | Meaning |
+|-------------------|---------|
+| `"adversarial"` | Adversarial Massart-style corruption |
+| `"sup_c"` | Fixed-noise / fixed-C model; supremum over `C_min <= C <= C_max` |
+| `"sup_rand"` | Gaussian oblivious noise; supremum over sigma |
+
+So for the fixed-noise case, set:
+
+```python
+corruption_type = "sup_c"
+```
+
+Do not use `"fixed"` unless the code is extended to recognize it as an alias.
+
 ---
 
 ## Notes

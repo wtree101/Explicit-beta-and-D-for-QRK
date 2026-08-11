@@ -5,7 +5,8 @@ Strategy
 1. Pin alpha_prime to the largest value that satisfies the per-step upper
    Chernoff bound  p_u <= 1 - (1 - delta_f)^{1/T}.
 2. Grid-search over alpha_0 and return the first feasible (alpha_0, alpha_prime)
-   found (early exit is acceptable: feasibility, not optimality, is the goal).
+   found by default. Optionally scan all feasible alpha_0 values and return the
+   one with the largest c.
 """
 
 # Module: grid/bisection search for feasible slack parameters.
@@ -24,6 +25,7 @@ def find_alpha_pair(
     num_grid: int = 50,
     c_target: float = 0.0,
     feasibility_check=None,
+    maximize_c: bool = False,
 ) -> tuple:
     """Find a feasible (alpha_0, alpha_prime) pair for the adversarial setting.
 
@@ -43,6 +45,9 @@ def find_alpha_pair(
         Number of grid points for alpha_0 search.
     c_target : float, optional
         Minimum required contraction rate.  Default 0.0.
+    maximize_c : bool, optional
+        If True, scan all feasible alpha_0 values and return the pair with the
+        largest contraction c.  If False, return the first feasible pair.
 
     Returns
     -------
@@ -92,7 +97,10 @@ def find_alpha_pair(
     if feasibility_check is None:
         feasibility_check = check_feasibility
 
-    # Return the first feasible pair (feasibility, not optimality).
+    best_pair = None
+    best_result = None
+    best_c = -np.inf
+
     for alpha_0 in np.linspace(0, q - beta, num_grid):
         if alpha_0 <= 0.0:
             continue
@@ -100,8 +108,16 @@ def find_alpha_pair(
             T, beta, D, q, alpha_0, alpha_prime, delta_f, c_target=c_target
         )
         if result["feasible"]:
-            return (alpha_0, alpha_prime), result
-        # else:
-        #     print(result["reason"])
+            if not maximize_c:
+                return (alpha_0, alpha_prime), result
+
+            c_value = result.get("c", result.get("c_min", -np.inf))
+            if c_value > best_c:
+                best_c = c_value
+                best_pair = (alpha_0, alpha_prime)
+                best_result = result
+
+    if best_pair is not None:
+        return best_pair, best_result
 
     return None, None

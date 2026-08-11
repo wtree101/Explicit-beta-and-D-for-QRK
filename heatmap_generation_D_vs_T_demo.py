@@ -20,14 +20,18 @@ if __name__ == '__main__':
     beta = 0.005
     D_sample_sizes = np.arange(30)+1
     T_intervals = 100
-    T_max = 10_000
+    T_max = 20_000
 
     # Sampling Parameters
-    num_samples = 100
+    num_samples = 10
     corruption_type = "adversarial"
+    #corruption_type = "sup_c"  
 
     # Min D parameters
     c = 0.001
+    c_success_mode = "bound"  # "fixed" uses preset c; "bound" uses per-cell feasible c.
+    #maximize_c_for_success = True
+    maximize_c_for_success = True
 
     generate_heat_map_matrix(
         D_vs_TYPE="D_vs_T",
@@ -45,4 +49,6 @@ if __name__ == '__main__':
         c_max=c_max,
         s_min=s_min,
         s_max=s_max,
+        c_success_mode=c_success_mode,
+        maximize_c_for_success=maximize_c_for_success,
     )
