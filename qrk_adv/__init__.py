@@ -1,5 +1,5 @@
-# qrk_adv: minimal package for computing the upper bound on D
-# (adversarial Massart noise, preliminary analysis)
-# Module: package marker and high-level description.
+"""Deprecated compatibility namespace for :mod:`qrk_analysis`."""
 
-from .debug import set_debug
+from qrk_analysis import set_debug
+
+__all__ = ["set_debug"]

@@ -32,10 +32,10 @@ class FixedSuccessCriterionTests(unittest.TestCase):
 
         self.assertNotIn("c_success_mode", parameters)
 
-    @patch("heatmap_data_generation.heatmapDataGeneration.os.cpu_count")
-    @patch("heatmap_data_generation.heatmapDataGeneration.smallest_D")
-    @patch("heatmap_data_generation.heatmapDataGeneration.save_heat_map_matrix")
-    @patch("heatmap_data_generation.heatmapDataGeneration.Pool")
+    @patch("experiments.heatmaps.generation.os.cpu_count")
+    @patch("experiments.heatmaps.generation.smallest_D")
+    @patch("experiments.heatmaps.generation.save_heat_map_matrix")
+    @patch("experiments.heatmaps.generation.Pool")
     def test_worker_count_is_limited_by_num_samples(
         self,
         mock_pool,
@@ -79,7 +79,7 @@ class FixedSuccessCriterionTests(unittest.TestCase):
         mock_pool.return_value.join.assert_called_once_with()
 
     @patch(
-        "heatmap_data_generation.heatmapDataGeneration."
+        "experiments.heatmaps.simulation."
         "streaming_subsampled_qRK_step"
     )
     def test_D_vs_beta_uses_preset_c(self, mock_step):
@@ -102,7 +102,7 @@ class FixedSuccessCriterionTests(unittest.TestCase):
         self.assertFalse(run_qRK_subsample_D_vs_beta(c=0.6, **common))
 
     @patch(
-        "heatmap_data_generation.heatmapDataGeneration."
+        "experiments.heatmaps.simulation."
         "streaming_subsampled_qRK_step"
     )
     def test_D_vs_T_uses_preset_c_at_each_time(self, mock_step):
@@ -155,9 +155,9 @@ class FixedSuccessCriterionTests(unittest.TestCase):
         self.assertNotIn("c_bound", filenames[0])
         self.assertNotIn("c_success", filenames[0])
 
-    @patch("heatmap_data_generation.heatmapDataGeneration.smallest_D")
-    @patch("heatmap_data_generation.heatmapDataGeneration.save_heat_map_matrix")
-    @patch("heatmap_data_generation.heatmapDataGeneration.Pool")
+    @patch("experiments.heatmaps.generation.smallest_D")
+    @patch("experiments.heatmaps.generation.save_heat_map_matrix")
+    @patch("experiments.heatmaps.generation.Pool")
     def test_small_D_vs_T_run_has_expected_shapes(
         self,
         mock_pool,
@@ -196,9 +196,9 @@ class FixedSuccessCriterionTests(unittest.TestCase):
         self.assertEqual(np.asarray(saved["D_min"]["mean_success"]).shape, (2, 1))
         self.assertNotIn("c_success_mode", saved[""])
 
-    @patch("heatmap_data_generation.heatmapDataGeneration.smallest_D")
-    @patch("heatmap_data_generation.heatmapDataGeneration.save_heat_map_matrix")
-    @patch("heatmap_data_generation.heatmapDataGeneration.Pool")
+    @patch("experiments.heatmaps.generation.smallest_D")
+    @patch("experiments.heatmaps.generation.save_heat_map_matrix")
+    @patch("experiments.heatmaps.generation.Pool")
     def test_small_D_vs_beta_run_has_expected_shape(
         self,
         mock_pool,

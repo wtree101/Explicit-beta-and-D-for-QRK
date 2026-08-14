@@ -1,15 +1,5 @@
-"""Debug utilities for qrk_adv."""
+"""Compatibility exports for :mod:`qrk_analysis.debug`."""
 
-DEBUG = False
+from qrk_analysis.debug import debug_log, set_debug
 
-
-def set_debug(enabled: bool) -> None:
-    """Enable or disable debug logging for qrk_adv."""
-    global DEBUG
-    DEBUG = bool(enabled)
-
-
-def debug_log(msg: str) -> None:
-    """Print debug messages when DEBUG is enabled."""
-    if DEBUG:
-        print(msg)
+__all__ = ["debug_log", "set_debug"]
