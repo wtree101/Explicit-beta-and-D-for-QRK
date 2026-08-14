@@ -45,7 +45,7 @@ adv_D_upper/
 
 ```bash
 cd adv_D_upper
-pip install numpy scipy matplotlib
+pip install -r requirements.txt
 python demo.py
 ```
 
@@ -177,8 +177,13 @@ The two conditions verified at each candidate D are:
 | `check_feasibility_conditions_C_sup_revised` | Fixed magnitude C; sup over `[C_min, C_max]` at each conditional quantile |
 | `check_feasibility_conditions_random_sup_revised` | Gaussian C ~ N(0, σ²); sup over `[sigma_min, sigma_max]` |
 
-Custom checks must accept `(T, beta, D, q, alpha_0, alpha_prime, delta_f, c_target=...)`
-and return a dict with `feasible`, plus `c` or `c_min` when feasible.
+Custom checks used by exploratory diagnostic searches must accept
+`(T, beta, D, q, alpha_0, alpha_prime, delta_f, c_target=...,
+*, enforce_failure_probability=True)`. They must return a dict containing
+`feasible`, `failure_prob`, and either `c` or `c_min`. When
+`enforce_failure_probability=False`, the check should still report the failure
+probability but must not reject an otherwise valid contraction candidate because
+it exceeds `delta_f`.
 
 ## Heatmap `corruption_type` values
 
@@ -188,7 +193,8 @@ simulation noise model and the matching feasibility check:
 | `corruption_type` | Meaning |
 |-------------------|---------|
 | `"adversarial"` | Adversarial Massart-style corruption |
-| `"sup_c"` | Fixed-noise / fixed-C model; supremum over `C_min <= C <= C_max` |
+| `"oblivious_large"` | Bernoulli corruption with separate large finite simulation noises for the quantile sample and candidate update |
+| `"sup_c"` | Simulation noise sampled uniformly from `c_min <= epsilon <= c_max` |
 | `"sup_rand"` | Gaussian oblivious noise; supremum over sigma |
 
 So for the fixed-noise case, set:
@@ -199,41 +205,76 @@ corruption_type = "sup_c"
 
 Do not use `"fixed"` unless the code is extended to recognize it as an alias.
 
-## Heatmap success criteria
+For the fixed-reference convergence experiment, `"oblivious_large"`
+independently samples the noise on each corrupted quantile-reference row from
+`Uniform(quantile_noise_min, quantile_noise_max)` and independently samples the
+corrupted candidate-row noise from
+`Uniform(update_noise_min, update_noise_max)`. The defaults
+`quantile_noise_min=quantile_noise_max=1e16` and
+`update_noise_min=update_noise_max=1e8` reproduce the previous deterministic
+large-noise behavior. Either interval can instead be set to `[-1000, 1000]` to
+use uniform oblivious noise for that role. All values are finite on purpose:
+IEEE infinity could make quantile interpolation or an accepted update produce
+`NaN`/`inf`. The corruption indicators remain Bernoulli with rate `beta`.
 
-The heatmap generator supports two success-judgement modes:
-
-```python
-c_success_mode = "fixed"
-```
-
-uses the same preset `c` for every heatmap cell.  A run is counted as
-successful when
-
-```text
-relative_error <= (1 - c / n)^T
-```
-
-This gives a uniform target rate across all `(D,T)` cells, so the success
-probabilities are easy to compare.  However, it can saturate for large `D`,
-because larger `D` produces larger `c`, and make the experiment easy to success.
+The simulation noise parameters are separate from the numerical parameters used
+to compute the theoretical `D_min`. Both `"sup_c"` and `"oblivious_large"` use
+the fixed-C supremum feasibility check with, by default,
 
 ```python
-c_success_mode = "bound"
-maximize_c_for_success = True
+feasibility_C_min = 0
+feasibility_C_max = 100
 ```
 
-uses a cell-wise certified contraction coefficient.  For each heatmap cell,
-the code computes a feasible bound-derived `c(D,T)` and uses
+This interval approximates a supremum over an unknown oblivious noise magnitude;
+it is not inferred from `c_min`, `c_max`, or either simulation-noise interval.
+The default grid currently uses 20 points, which can be increased in
+`make_feasibility_check` when a finer numerical supremum is needed.
+
+## Heatmap success criterion
+
+The heatmap generator uses the same preset `c` for every heatmap cell. A run
+is counted as successful when
 
 ```text
-relative_error <= (1 - c(D,T) / n)^T
+squared_relative_error <= (1 - c / n)^T
 ```
 
-as the success criterion.  With `maximize_c_for_success = True`, the code
-searches over all feasible `alpha_0` grid points and uses the largest
-certified `c`.  This is stricter for large `D` and can better show the
-relationship between `D` and `T`.
+This is a uniform and directly comparable experimental threshold across all
+cells. The preset `c` is not claimed to estimate the experiment's actual
+contraction rate. The former `c_bound` success mode was removed because the
+bound-derived value did not accurately represent that empirical rate.
+
+The separately generated `D_min` curve is different: it still uses the full
+theoretical feasibility and failure-probability constraints, with the preset
+`c` as `c_target`, and retains its theoretical meaning.
+
+`find_max_c_without_failure_constraint` remains available only for historical
+or exploratory diagnostics. Its output must not be used as a heatmap success
+criterion. Historical `c_bound` display material is kept under
+`heatmap_data_display/archive/` and new heatmap runs do not generate those
+matrices or filename suffixes.
+
+## Convergence curves at fixed T
+
+`convergence_curves_D_demo.py` compares full convergence trajectories for a
+list of D values at one fixed time horizon. Its default configuration uses
+`corruption_type="oblivious_large"`, `D=1,...,10`, and 5 independent trials:
+
+```bash
+python3 convergence_curves_D_demo.py
+```
+
+For every D, the figure shows the mean squared relative error as a solid line,
+a 10%-90% trial band, and `(1-c/n)^t` using the preset fixed `c` as a
+black dashed reference. This dashed curve is a fixed success reference,
+not an estimate of the actual contraction rate. The script saves both a PNG
+and the complete trial data as an NPZ file under `figure/`.
+
+Edit `ExperimentConfig` near the top of the script to change `T`, `D_list`,
+`num_trials`, `record_every`, `fixed_c`, or the noise model. The full curves
+should be used to compare empirical rates across D; the binary success
+criterion intentionally remains uniform and simple.
 
 ---
 

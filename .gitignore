@@ -4,3 +4,8 @@ find_D_min_D_vs_T.py
 
 # All MATLAB tmp files
 *.asv
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class

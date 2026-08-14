@@ -35,6 +35,8 @@ def check_feasibility(
     alpha_prime: float,
     delta_f: float,
     c_target: float = 0.0,
+    *,
+    enforce_failure_probability: bool = True,
 ) -> dict:
     """Check adversarial Massart feasibility conditions.
 
@@ -56,6 +58,9 @@ def check_feasibility(
         Allowed total failure probability over T iterations.
     c_target : float, optional
         Minimum required net contraction rate.  Default 0.0 (c > 0 suffices).
+    enforce_failure_probability : bool, optional
+        If False, compute and return failure diagnostics without rejecting the
+        result when the failure probability exceeds ``delta_f``.
 
     Returns
     -------
@@ -97,12 +102,18 @@ def check_feasibility(
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
     failure_prob = 1.0 - (1.0 - p_u) ** T
 
-    if failure_prob > delta_f:
+    failure_constraint_satisfied = failure_prob <= delta_f
+    if enforce_failure_probability and not failure_constraint_satisfied:
         return {
             "feasible": False,
             "reason": "failure probability too high",
+            "p_l_c": p_l_c,
+            "c": c,
+            "p_u": p_u,
             "failure_prob": failure_prob,
             "delta_f": delta_f,
+            "failure_constraint_enforced": True,
+            "failure_constraint_satisfied": False,
         }
 
     return {
@@ -111,6 +122,8 @@ def check_feasibility(
         "c": c,
         "p_u": p_u,
         "failure_prob": failure_prob,
+        "failure_constraint_enforced": enforce_failure_probability,
+        "failure_constraint_satisfied": failure_constraint_satisfied,
     }
 
 
@@ -130,8 +143,10 @@ def check_feasibility_conditions_random_sup_revised(
     sigma_max: float = 10.0, #safe for alpha' > 0.00001; may need to set larger if return smaller alpha'. 
     num_points_C: int = 20, #seems to stable after num_points_C>10
     c_target: float = 0.0,
+    *,
+    enforce_failure_probability: bool = True,
 ) -> dict:
-    
+
     """Revised Gaussian check taking a supremum over sigma on a grid.
 
     This is the oblivious Gaussian-noise variant. It evaluates the net
@@ -165,6 +180,8 @@ def check_feasibility_conditions_random_sup_revised(
 
     c_target : float
         Minimum required contraction rate.
+    enforce_failure_probability : bool, optional
+        If False, retain failure diagnostics but do not enforce their budget.
     """
     debug_log(f"num_grid_Q={num_grid_Q}, num_points_C={num_points_C}")
     if not (0 <= alpha_0 <= q - beta):
@@ -233,13 +250,16 @@ def check_feasibility_conditions_random_sup_revised(
     # Upper tail over T iterations.
     failure_prob = 1.0 - (1.0 - p_u) ** T
 
-    if failure_prob > delta_f:
+    failure_constraint_satisfied = failure_prob <= delta_f
+    if enforce_failure_probability and not failure_constraint_satisfied:
         return {
             "feasible": False,
             "reason": "failure probability too high",
             "failure_prob": failure_prob,
             "delta_f": delta_f,
             "c_min": c_min,
+            "failure_constraint_enforced": True,
+            "failure_constraint_satisfied": False,
         }
 
     return {
@@ -252,6 +272,8 @@ def check_feasibility_conditions_random_sup_revised(
         "p_l_c": p_l_c,
         "p_u": p_u,
         "failure_prob": failure_prob,
+        "failure_constraint_enforced": enforce_failure_probability,
+        "failure_constraint_satisfied": failure_constraint_satisfied,
     }
 
 
@@ -268,6 +290,8 @@ def check_feasibility_conditions_C_sup_revised(
     C_max: float = 20.0,
     num_points_C: int = 20,
     c_target: float = 0.0,
+    *,
+    enforce_failure_probability: bool = True,
 ) -> dict:
     """Revised fixed-noise check: supremum over C on a grid at each Q_{q,k+1}.
 
@@ -307,6 +331,8 @@ def check_feasibility_conditions_C_sup_revised(
         Grid size inside :func:`~qrk_adv.noise.find_C_with_largest_error_increase_fast`.
     c_target : float
         Minimum required pointwise contraction (applied to c_min).
+    enforce_failure_probability : bool, optional
+        If False, retain failure diagnostics but do not enforce their budget.
 
     Returns
     -------
@@ -329,12 +355,12 @@ def check_feasibility_conditions_C_sup_revised(
     S_star_penalty = (1 - beta) * p_l * sigma_min_alpha0_square(alpha_0 / (1.0 - beta), q)
 
     q_grid = np.linspace(alpha_0 / (1.0 - beta), 1.0 - alpha_prime / (1.0 - beta), num_grid_Q)
-    debug_log(f"q_grid: {q_grid}")
+
+    debug_log(f"q_grid: {np.array2string(q_grid, precision=10)}")
     c_values = np.full(num_grid_Q, np.nan)
     c_min = np.inf
     worst_Qq = q_grid[0]
     worst_Qq_C_star = np.nan
-
     for idx, q_cond in enumerate(q_grid):
         decrease = (1 - beta) * sigma_min_alpha0_square(q_cond, q)
         phi_q = half_normal_quantile(q_cond)
@@ -374,7 +400,8 @@ def check_feasibility_conditions_C_sup_revised(
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
     failure_prob = 1.0 - (1.0 - p_u) ** T
 
-    if failure_prob > delta_f:
+    failure_constraint_satisfied = failure_prob <= delta_f
+    if enforce_failure_probability and not failure_constraint_satisfied:
         return {
             "feasible": False,
             "reason": "failure probability too high",
@@ -383,6 +410,8 @@ def check_feasibility_conditions_C_sup_revised(
             "c_min": c_min,
             "worst_Qq": worst_Qq,
             "worst_Qq_C_star": worst_Qq_C_star,
+            "failure_constraint_enforced": True,
+            "failure_constraint_satisfied": False,
         }
 
     return {
@@ -396,4 +425,6 @@ def check_feasibility_conditions_C_sup_revised(
         "p_l_c": p_l_c,
         "p_u": p_u,
         "failure_prob": failure_prob,
+        "failure_constraint_enforced": enforce_failure_probability,
+        "failure_constraint_satisfied": failure_constraint_satisfied,
     }

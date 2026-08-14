@@ -6,32 +6,46 @@ if __name__ == '__main__':
     n = 100
 
     # Noise Parameters
-    c_min = -10
-    c_max = 10
+    # Used only by sup_c simulation: epsilon ~ Uniform(c_min, c_max).
+    c_min = -1000
+    c_max = 1000
+    # variance for Gaussian noise
     s_min = 0
     s_max = 10
+    # oblivious_large simulation noise
+    quantile_noise_min = -2000
+    quantile_noise_max = 2000
+    update_noise_min = -1000
+    update_noise_max = 1000
+
+    # Numerical sup_C range for the theoretical oblivious-noise feasibility.
+    # This is independent of the simulated noise values above.
+    feasibility_C_min = 0
+    feasibility_C_max = 20
+
+    # Set to an integer for a reproducible experiment, or None for a fresh run.
+    random_seed = 2026
+    rng = np.random.default_rng(random_seed)
 
     # True solution
-    x = np.random.normal(size=n)
+    x = rng.normal(size=n)
     x = x / np.linalg.norm(x)
 
     # Algorithm parameters
     q = 0.8
-    beta = 0.005
-    D_sample_sizes = np.arange(30)+1
+    beta = 0.01
+    D_sample_sizes = (np.arange(30))+1
     T_intervals = 100
     T_max = 20_000
 
     # Sampling Parameters
-    num_samples = 10
-    corruption_type = "adversarial"
-    #corruption_type = "sup_c"  
+    num_samples = 100
+    # None uses min(num_samples, available CPU cores).
+    num_workers = 8
+    corruption_type = "adversarial"  # "sup_c" / "oblivious_large" / "adversarial"
 
     # Min D parameters
-    c = 0.001
-    c_success_mode = "bound"  # "fixed" uses preset c; "bound" uses per-cell feasible c.
-    #maximize_c_for_success = True
-    maximize_c_for_success = True
+    c = 0.01
 
     generate_heat_map_matrix(
         D_vs_TYPE="D_vs_T",
@@ -49,6 +63,12 @@ if __name__ == '__main__':
         c_max=c_max,
         s_min=s_min,
         s_max=s_max,
-        c_success_mode=c_success_mode,
-        maximize_c_for_success=maximize_c_for_success,
+        quantile_noise_min=quantile_noise_min,
+        quantile_noise_max=quantile_noise_max,
+        update_noise_min=update_noise_min,
+        update_noise_max=update_noise_max,
+        feasibility_C_min=feasibility_C_min,
+        feasibility_C_max=feasibility_C_max,
+        num_workers=num_workers,
+        random_seed=random_seed,
     )

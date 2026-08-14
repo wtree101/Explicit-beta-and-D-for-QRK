@@ -1,57 +1,58 @@
+import os
 from multiprocessing import Pool
+
 import numpy as np
 from tqdm import tqdm
-import time
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 from qrk_adv.upper_bound import smallest_D
-from qrk_adv.search import find_alpha_pair
 from functools import partial
 from qrk_adv.feasibility import check_feasibility_conditions_random_sup_revised
 from qrk_adv.feasibility import check_feasibility_conditions_C_sup_revised
-import os
 
 
-def make_feasibility_check(corruption_type, c_min, c_max):
+def make_feasibility_check(
+    corruption_type,
+    feasibility_C_min=0.0,
+    feasibility_C_max=100.0,
+):
     match corruption_type:
         case "adversarial":
             return None
-        case "sup_c":
-            return partial(check_feasibility_conditions_C_sup_revised,num_grid_Q=2,C_min=c_min,C_max=c_max,num_points_C=20)
+        case "sup_c" | "oblivious_large":
+            return partial(
+                check_feasibility_conditions_C_sup_revised,
+                num_grid_Q=2,
+                C_min=feasibility_C_min,
+                C_max=feasibility_C_max,
+                num_points_C=20,
+            )
         case "sup_rand":
             return partial(check_feasibility_conditions_random_sup_revised,num_grid_Q=20,num_points_C=50)
         case _:
             raise ValueError(f"Unknown corruption_type: {corruption_type}")
 
 
-def c_from_feasibility_result(result):
-    if result is None:
-        return np.nan
-    return result.get("c", result.get("c_min", np.nan))
-
-
-def cell_bound_c(T, beta, D, q, delta_f, c_target, feasibility_check, maximize_c):
-    alpha_pair, result = find_alpha_pair(
-        T,
-        beta,
-        D,
-        q,
-        delta_f,
-        c_target=c_target,
-        feasibility_check=feasibility_check,
-        maximize_c=maximize_c,
+def validate_oblivious_large_noise(
+    quantile_noise_min,
+    quantile_noise_max,
+    update_noise_min,
+    update_noise_max,
+):
+    values = (
+        quantile_noise_min,
+        quantile_noise_max,
+        update_noise_min,
+        update_noise_max,
     )
-    if alpha_pair is None:
-        return np.nan
-    return c_from_feasibility_result(result)
-
-
-def c_at_interval(c, interval_index):
-    c_array = np.asarray(c)
-    if c_array.ndim == 0:
-        return float(c_array)
-    return float(c_array[interval_index])
+    if not all(np.isfinite(value) for value in values):
+        raise ValueError("oblivious_large noise values must be finite")
+    if quantile_noise_min > quantile_noise_max:
+        raise ValueError(
+            "oblivious_large requires quantile_noise_min <= quantile_noise_max"
+        )
+    if update_noise_min > update_noise_max:
+        raise ValueError(
+            "oblivious_large requires update_noise_min <= update_noise_max"
+        )
 
 
 def streaming_subsampled_qRK_step(
@@ -64,7 +65,12 @@ def streaming_subsampled_qRK_step(
     c_min,
     c_max,
     s_min,
-    s_max
+    s_max,
+    *,
+    quantile_noise_min=1e16,
+    quantile_noise_max=1e16,
+    update_noise_min=1e8,
+    update_noise_max=1e8,
 ):
     n = len(x)
     A = np.random.normal(size=(D+1,n))
@@ -84,6 +90,32 @@ def streaming_subsampled_qRK_step(
             q_e = np.mean(abs(residuals[1:])<=Q)
             if abs(residuals[0]) <= np.quantile(abs(residuals[1:]),q):
                 xk = xk + residuals[0] * A[0,:].T
+        case "oblivious_large":
+            validate_oblivious_large_noise(
+                quantile_noise_min,
+                quantile_noise_max,
+                update_noise_min,
+                update_noise_max,
+            )
+            xi = np.random.binomial(1, beta, size=(D + 1,))
+            clean_residuals = A @ (x - xk)
+            quantile_noise = np.random.uniform(
+                low=quantile_noise_min,
+                high=quantile_noise_max,
+                size=D,
+            )
+            update_noise = np.random.uniform(
+                low=update_noise_min,
+                high=update_noise_max,
+            )
+            quantile_residuals = (
+                clean_residuals[1:] + xi[1:] * quantile_noise
+            )
+            update_residual = clean_residuals[0] + xi[0] * update_noise
+            Q = np.quantile(abs(quantile_residuals), q)
+            q_e = np.mean(abs(quantile_residuals) <= Q)
+            if abs(update_residual) <= Q:
+                xk = xk + update_residual * A[0, :].T
         case "adversarial":
             xi = np.random.binomial(1,beta,size=(D+1,))
             # epsilon = np.random.normal(size=(D+1,))
@@ -118,11 +150,25 @@ def run_qRK_subsample_D_vs_beta(
     c_min,
     c_max,
     s_min,
-    s_max
+    s_max,
+    quantile_noise_min=1e16,
+    quantile_noise_max=1e16,
+    update_noise_min=1e8,
+    update_noise_max=1e8,
+    random_seed=None,
 ):
+    if random_seed is not None:
+        np.random.seed(random_seed)
+
     xk = np.zeros(np.shape(x))
     for i in range(T_max):
-        xk = streaming_subsampled_qRK_step(x,xk,q,beta,D,corruption_type,c_min,c_max,s_min,s_max)[0]
+        xk = streaming_subsampled_qRK_step(
+            x, xk, q, beta, D, corruption_type, c_min, c_max, s_min, s_max,
+            quantile_noise_min=quantile_noise_min,
+            quantile_noise_max=quantile_noise_max,
+            update_noise_min=update_noise_min,
+            update_noise_max=update_noise_max,
+        )[0]
 
     # Squared Relative Err < (1-c/n)^T
     return np.linalg.norm(xk-x)**2 / (np.linalg.norm(x)**2) < (1-c/n)**T_max
@@ -140,18 +186,33 @@ def run_qRK_subsample_D_vs_T(
     c_min,
     c_max,
     s_min,
-    s_max
+    s_max,
+    quantile_noise_min=1e16,
+    quantile_noise_max=1e16,
+    update_noise_min=1e8,
+    update_noise_max=1e8,
+    random_seed=None,
 ):
+    if random_seed is not None:
+        np.random.seed(random_seed)
+
     # Returns boolean-valued array with k-th place corresponding to k*T_intervals iteration succeeding
     errs = np.zeros(int(T_max/T_intervals))
     xk = np.zeros(np.shape(x))
 
     for i in range(T_max):
-        if i % T_intervals == 0:
-            c_i = c_at_interval(c, int(i/T_intervals))
+        (xk,q_e) = streaming_subsampled_qRK_step(
+            x, xk, q, beta, D, corruption_type, c_min, c_max, s_min, s_max,
+            quantile_noise_min=quantile_noise_min,
+            quantile_noise_max=quantile_noise_max,
+            update_noise_min=update_noise_min,
+            update_noise_max=update_noise_max,
+        )
+        completed_iterations = i + 1
+        if completed_iterations % T_intervals == 0:
+            interval_index = int(completed_iterations/T_intervals) - 1
             # Squared Relative Err < (1-c/n)^T
-            errs[int(i/T_intervals)] = np.linalg.norm(xk-x)**2 / (np.linalg.norm(x)**2) <= (1-c_i/n)**i
-        (xk,q_e) = streaming_subsampled_qRK_step(x,xk,q,beta,D,corruption_type,c_min,c_max,s_min,s_max)
+            errs[interval_index] = np.linalg.norm(xk-x)**2 / (np.linalg.norm(x)**2) <= (1-c/n)**completed_iterations
     return (errs,q_e)
 
 def generate_heat_map_matrix(
@@ -171,50 +232,84 @@ def generate_heat_map_matrix(
     c_max=1,
     s_min=0,
     s_max=1,
-    c_success_mode="fixed",
-    maximize_c_for_success=True
+    quantile_noise_min=1e16,
+    quantile_noise_max=1e16,
+    update_noise_min=1e8,
+    update_noise_max=1e8,
+    feasibility_C_min=0.0,
+    feasibility_C_max=100.0,
+    num_workers=None,
+    random_seed=None,
 ):
     # Min D parameters
     delta_f = 0.1
     D_max = 500
-    feasibility_check = make_feasibility_check(corruption_type, c_min, c_max)
+    if corruption_type == "oblivious_large":
+        validate_oblivious_large_noise(
+            quantile_noise_min,
+            quantile_noise_max,
+            update_noise_min,
+            update_noise_max,
+        )
+    feasibility_check = make_feasibility_check(
+        corruption_type,
+        feasibility_C_min=feasibility_C_min,
+        feasibility_C_max=feasibility_C_max,
+    )
+    if num_samples < 1:
+        raise ValueError("num_samples must be at least 1")
+    if num_workers is not None and num_workers < 1:
+        raise ValueError("num_workers must be at least 1 or None")
+
+    available_workers = os.cpu_count() or 1
+    worker_count = min(num_samples, num_workers or available_workers)
+    seed_entropy = np.random.SeedSequence(random_seed).entropy
+
+    def sample_seeds(parameter_index):
+        return [
+            int(
+                np.random.SeedSequence(
+                    [seed_entropy, parameter_index, sample_index]
+                ).generate_state(1)[0]
+            )
+            for sample_index in range(num_samples)
+        ]
 
     match D_vs_TYPE:
         case "D_vs_T":
             open("./q_e/most_recent_q_e.txt","w").close()
 
-            pool = Pool(processes=48)
+            pool = Pool(processes=worker_count)
 
             sample_success = np.zeros((num_samples,int(T_max/T_intervals)))
             mean_success = np.zeros((len(D_sample_sizes),int(T_max/T_intervals)))
 
             # Run samples and log success rate for each (D,T) pair
-            D_pos = 0
-            c_bound_values = np.full((len(D_sample_sizes),int(T_max/T_intervals)),np.nan)
-            for D in tqdm(D_sample_sizes):
-                c_for_success = c
-                if c_success_mode == "bound":
-                    c_for_success = np.array([
-                        c if i == 0 else cell_bound_c(i, beta, D, q, delta_f, c, feasibility_check, maximize_c_for_success)
-                        for i in range(0, T_max, T_intervals)
-                    ])
-                    c_bound_values[D_pos,:] = c_for_success
-                elif c_success_mode != "fixed":
-                    raise ValueError(f"Unknown c_success_mode: {c_success_mode}")
+            try:
+                for D_pos, D in enumerate(tqdm(D_sample_sizes)):
+                    sample_results = pool.starmap(
+                        run_qRK_subsample_D_vs_T,
+                        [
+                            (
+                                D, T_max, T_intervals, x, q, beta, n, c,
+                                corruption_type, c_min, c_max, s_min, s_max,
+                                quantile_noise_min, quantile_noise_max,
+                                update_noise_min, update_noise_max, seed,
+                            )
+                            for seed in sample_seeds(D_pos)
+                        ],
+                    )
+                    sample_success = np.array([r[0] for r in sample_results])
+                    sample_q_e = np.array([r[1] for r in sample_results])
+                    mean_success[D_pos,:] = np.mean(sample_success,axis=0)
 
-                sample_results = pool.starmap(run_qRK_subsample_D_vs_T,[(D,T_max,T_intervals,x,q,beta,n,c_for_success,corruption_type,c_min,c_max,s_min,s_max)]*num_samples)
-                sample_success = np.array([r[0] for r in sample_results])
-                sample_q_e = np.array([r[1] for r in sample_results])
-                mean_success[D_pos,:] = np.mean(sample_success,axis=0)
+                    with open("./q_e/most_recent_q_e.txt","a") as f:
+                        f.write(f"(D:{D}) {np.mean(sample_q_e)}\n")
+            finally:
+                pool.close()
+                pool.join()
 
-                with open("./q_e/most_recent_q_e.txt","a") as f:
-                    f.write(f"(D:{D}) {np.mean(sample_q_e)}\n")
-
-                D_pos += 1
-
-            save_heat_map_matrix(D_vs_TYPE="D_vs_T",data_type="",mean_success=np.matrix(mean_success),n=n,D_sample_sizes=D_sample_sizes,num_samples=num_samples,T_max=T_max,q=q,c=c,corruption_type=corruption_type,beta=beta,T_intervals=T_intervals,c_success_mode=c_success_mode,maximize_c_for_success=maximize_c_for_success)
-            if c_success_mode == "bound":
-                save_heat_map_matrix(D_vs_TYPE="D_vs_T",data_type="c_bound",mean_success=np.matrix(c_bound_values),n=n,D_sample_sizes=D_sample_sizes,num_samples=num_samples,T_max=T_max,q=q,c=c,corruption_type=corruption_type,beta=beta,T_intervals=T_intervals,c_success_mode=c_success_mode,maximize_c_for_success=maximize_c_for_success)
+            save_heat_map_matrix(D_vs_TYPE="D_vs_T",data_type="",mean_success=np.matrix(mean_success),n=n,D_sample_sizes=D_sample_sizes,num_samples=num_samples,T_max=T_max,q=q,c=c,corruption_type=corruption_type,beta=beta,T_intervals=T_intervals)
 
             # Generate and save D_min values
             D_min_vals = np.zeros(int(T_max/T_intervals))
@@ -227,8 +322,6 @@ def generate_heat_map_matrix(
             \tq:\t\t\t{q}
             \tbeta:\t\t\t{beta}
             \tc:\t\t\t{c}
-            \tc_success_mode:\t{c_success_mode}
-            \tmaximize_c_for_success:\t{maximize_c_for_success}
             \tD_min:\t\t\t{np.min(D_sample_sizes)}
             \tD_max:\t\t\t{np.max(D_sample_sizes)}
             \tnum_samples:\t\t{num_samples}
@@ -237,31 +330,39 @@ def generate_heat_map_matrix(
             \tcorruption_type:\t{corruption_type}""")
             
         case "D_vs_beta":
-            pool = Pool(processes=48)
+            pool = Pool(processes=worker_count)
 
             sample_success = np.zeros(num_samples)
             mean_success = np.zeros((len(D_sample_sizes)*len(beta_samples)))
 
             # Run samples and log success rate for each (D,beta) pair
-            c_bound_values = np.full((len(D_sample_sizes),len(beta_samples)),np.nan)
             pos = 0
-            for D_pos, D in tqdm(list(enumerate(D_sample_sizes))):
-                for beta_pos, beta in enumerate(beta_samples):
-                    c_for_success = c
-                    if c_success_mode == "bound":
-                        c_for_success = cell_bound_c(T_max, beta, D, q, delta_f, c, feasibility_check, maximize_c_for_success)
-                        c_bound_values[D_pos,beta_pos] = c_for_success
-                    elif c_success_mode != "fixed":
-                        raise ValueError(f"Unknown c_success_mode: {c_success_mode}")
-
-                    sample_success = np.array(pool.starmap(run_qRK_subsample_D_vs_beta,[(D,T_max,x,q,beta,n,c_for_success,corruption_type,c_min,c_max,s_min,s_max)]*num_samples))
-                    mean_success[pos] = np.mean(sample_success)
-                    pos += 1
+            try:
+                for D in tqdm(D_sample_sizes):
+                    for beta in beta_samples:
+                        sample_success = np.array(
+                            pool.starmap(
+                                run_qRK_subsample_D_vs_beta,
+                                [
+                                    (
+                                        D, T_max, x, q, beta, n, c,
+                                        corruption_type, c_min, c_max, s_min,
+                                        s_max, quantile_noise_min,
+                                        quantile_noise_max, update_noise_min,
+                                        update_noise_max, seed,
+                                    )
+                                    for seed in sample_seeds(pos)
+                                ],
+                            )
+                        )
+                        mean_success[pos] = np.mean(sample_success)
+                        pos += 1
+            finally:
+                pool.close()
+                pool.join()
             
             mean_success =  np.reshape(mean_success,(len(D_sample_sizes),len(beta_samples)))
-            save_heat_map_matrix(D_vs_TYPE="D_vs_beta",data_type="",mean_success=mean_success,n=n,D_sample_sizes=D_sample_sizes,num_samples=num_samples,T_max=T_max,q=q,c=c,corruption_type=corruption_type,beta_samples=beta_samples,c_success_mode=c_success_mode,maximize_c_for_success=maximize_c_for_success)
-            if c_success_mode == "bound":
-                save_heat_map_matrix(D_vs_TYPE="D_vs_beta",data_type="c_bound",mean_success=c_bound_values,n=n,D_sample_sizes=D_sample_sizes,num_samples=num_samples,T_max=T_max,q=q,c=c,corruption_type=corruption_type,beta_samples=beta_samples,c_success_mode=c_success_mode,maximize_c_for_success=maximize_c_for_success)
+            save_heat_map_matrix(D_vs_TYPE="D_vs_beta",data_type="",mean_success=mean_success,n=n,D_sample_sizes=D_sample_sizes,num_samples=num_samples,T_max=T_max,q=q,c=c,corruption_type=corruption_type,beta_samples=beta_samples)
 
             D_min_vals = np.zeros(len(beta_samples))
             for i in tqdm(range(len(beta_samples))):
@@ -278,8 +379,6 @@ def generate_heat_map_matrix(
             \tbeta_min:\t\t{np.min(beta_samples)}
             \tbeta_max:\t\t{np.max(beta_samples)}
             \tc:\t\t\t{c}
-            \tc_success_mode:\t{c_success_mode}
-            \tmaximize_c_for_success:\t{maximize_c_for_success}
             \tD_min:\t\t\t{np.min(D_sample_sizes)}
             \tD_max:\t\t\t{np.max(D_sample_sizes)}
             \tnum_samples:\t\t{num_samples}
@@ -300,15 +399,12 @@ def save_heat_map_matrix(
     beta=0,
     T_intervals=1,
     beta_samples=np.zeros(1),
-    c_success_mode="fixed",
-    maximize_c_for_success=True
 ):
     # Save success matrix
     mean_success_mat = np.matrix(mean_success)
     
     fullfilename = ""
     filepath = "./heat_map_raw_data/"
-    c_success_suffix = "" if c_success_mode == "fixed" else f"__c_success={c_success_mode}__max_c={maximize_c_for_success}"
     match D_vs_TYPE:
         case "D_vs_beta":
             filename1 = "D_vs_beta"
@@ -319,11 +415,9 @@ def save_heat_map_matrix(
                     filename2 = "__D_samples"
                 case "beta_samples":
                     filename2 = "__beta_samples"
-                case "c_bound":
-                    filename2 = "__c_bound"
                 case "":
                     filename2 = ""
-            filename3 = f"__n={n}__q={q*100:2.0f}__beta_min={np.min(beta_samples)*100:.0f}__beta_max={np.max(beta_samples)*100:.0f}__D_min={np.min(D_sample_sizes)}__D_max={np.max(D_sample_sizes)}__c={c:1.0e}__num_samples={num_samples}__T_max={T_max}__corruption_type={corruption_type}{c_success_suffix}.txt"
+            filename3 = f"__n={n}__q={q*100:2.0f}__beta_min={np.min(beta_samples)*100:.0f}__beta_max={np.max(beta_samples)*100:.0f}__D_min={np.min(D_sample_sizes)}__D_max={np.max(D_sample_sizes)}__c={c:1.0e}__num_samples={num_samples}__T_max={T_max}__corruption_type={corruption_type}.txt"
             fullfilename = filepath + filename1 + filename2 + filename3
 
         case "D_vs_T":
@@ -331,12 +425,9 @@ def save_heat_map_matrix(
             match data_type:
                 case "D_min":
                     filename2 = "__D_MIN"
-                case "c_bound":
-                    filename2 = "__c_bound"
                 case "":
                     filename2 = ""
-            filename3 = f"__n={n}__q={q*100:2.0f}__beta={beta*100:.0f}__D_min={np.min(D_sample_sizes)}__D_max={np.max(D_sample_sizes)}__c={c:1.0e}__num_samples={num_samples}__T_intervals={T_intervals}__T_max={T_max}__corruption_type={corruption_type}{c_success_suffix}.txt"    
-            # fullfilename = os.path.join(os.pardir, filepath + filename1 + filename2 + filename3)
+            filename3 = f"__n={n}__q={q*100:2.0f}__beta={beta*100:.0f}__D_min={np.min(D_sample_sizes)}__D_max={np.max(D_sample_sizes)}__c={c:1.0e}__num_samples={num_samples}__T_intervals={T_intervals}__T_max={T_max}__corruption_type={corruption_type}.txt"
             fullfilename = filepath + filename1 + filename2 + filename3
             print(fullfilename)
 

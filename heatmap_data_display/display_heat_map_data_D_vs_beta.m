@@ -5,8 +5,8 @@ beta_min    = 0.00;
 beta_max    = 0.02;
 D_min       = 1;
 D_max       = 30;
-c           = 1e-3;
-num_samples = 100;
+c           = 1e-2;
+num_samples = 10;
 T_max       = 20000;
 corruption_type = 'sup_c';
 
