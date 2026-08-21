@@ -9,3 +9,4 @@ find_D_min_D_vs_T.py
 __pycache__/
 *.py[cod]
 *$py.class
+run_codes_on_server/
