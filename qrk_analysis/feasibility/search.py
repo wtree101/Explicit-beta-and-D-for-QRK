@@ -39,7 +39,9 @@ def _largest_failure_feasible_alpha_prime(
     interior_offset = min(tolerance, upper_bound / 4.0)
     lower = interior_offset
     upper = upper_bound - interior_offset
-    per_step_budget = 1.0 - (1.0 - delta_f) ** (1.0 / T) if T > 0 else delta_f
+    per_step_budget = (
+        -np.expm1(np.log1p(-delta_f) / T) if T > 0 else delta_f
+    )
 
     def is_feasible(alpha_prime: float) -> bool:
         if D == np.inf or beta == 0.0:

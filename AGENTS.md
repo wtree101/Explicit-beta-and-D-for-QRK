@@ -3,9 +3,12 @@
 ## Canonical ownership
 
 - `qrk_analysis/` is the only maintained numerical theory implementation.
-- `qrk_adv/` and `heatmap_data_generation/` are compatibility facades. Never
-  add formulas, searches, or simulation logic to them.
-- `experiments/heatmaps/` owns simulation, generation, and output formatting.
+- `experiments/heatmaps/` is the only maintained heatmap API and owns
+  simulation, generation, theory selection, and output formatting.
+- `heatmap_data_display/` is the maintained cached-data plotting entry point.
+  It reads explicit profiles and must not import or trigger simulations.
+- Maintained code imports `qrk_analysis` and `experiments.heatmaps` directly;
+  there are no top-level compatibility packages.
 - `legacy/` is read-only historical material.
 
 ## Environment and tests
@@ -44,3 +47,20 @@ python -m qrk_analysis.programs.demo_paper_bounds --paper --recompute
 
 Formal PDFs are written to the parent paper tree; curve caches stay under
 `figure/paper_bounds/cache/`.
+
+Plot existing heatmap data without recomputation with:
+
+```bash
+python -m heatmap_data_display.plot_heatmaps --list-profiles
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-t-massart
+```
+
+Profiles bind exact files under `heat_map_raw_data/`; never infer the latest
+dataset. `--d-min` and `--d-max` affect only the displayed range and otherwise
+default to the cached data extent. Preview PDFs go to `figure/heatmaps/`. Only
+`--paper` may replace stable PDFs under the paper's `figures/heat_maps/`
+directory. Validate every
+selected input before writing, render each PDF for visual inspection, and
+rebuild the paper after changing LaTeX figure references. Do not perform a
+partial four-panel refresh, and keep shared display ranges aligned across the
+Massart/oblivious comparison.

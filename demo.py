@@ -27,11 +27,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from functools import partial
 
-from qrk_adv.upper_bound import smallest_D
-from qrk_adv.feasibility import check_feasibility
-from qrk_adv.feasibility import check_feasibility_conditions_random_sup_revised
-from qrk_adv.feasibility import check_feasibility_conditions_C_sup_revised
-from qrk_adv import set_debug
+from qrk_analysis import set_debug
+from qrk_analysis.feasibility.check import (
+    check_feasibility,
+    check_feasibility_conditions_C_sup_revised,
+    check_feasibility_conditions_random_sup_revised,
+)
+from qrk_analysis.upper_bound import smallest_D
 
 #set_debug(True)   # 打开调试输出
 set_debug(False)  # 关闭调试输出

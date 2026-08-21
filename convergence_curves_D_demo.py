@@ -7,7 +7,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from heatmap_data_generation.heatmapDataGeneration import (
+from experiments.heatmaps import (
     streaming_subsampled_qRK_step,
     validate_oblivious_large_noise,
 )

@@ -1,32 +1,38 @@
 # Streaming QRK analysis and experiments
 
-This repository is the canonical implementation for the explicit corruption
-and subsample-size bounds in the streaming quantile randomized Kaczmarz paper.
-It also contains the Monte Carlo heatmap experiments used to compare theory
-with empirical convergence.
+This repository contains the canonical numerical theory and Monte Carlo
+experiments for the paper on quantile randomized Kaczmarz (QRK) for streaming
+corrupted linear systems.
 
-## Setup
+The maintained Python packages are:
 
-Use Python 3.10 or newer. In the project Conda environment:
+- `qrk_analysis`: produces theoretical curves. Includes quantiles, noise models, feasibility checks, parameter
+  searches, and the integer `smallest_D` API.
+- `experiments.heatmaps`: produces practical results through streaming
+  simulations, heatmap generation, theoretical model selection, and stable
+  text output.
+- `heatmap_data_display`: renders explicitly selected cached heatmap data
+  without rerunning simulations.
+
+Archived exploratory programs live in `legacy/` and are not part of the
+supported API.
+
+## Setup and verification
+
+Run from this directory in the Conda base environment:
 
 ```bash
+conda activate base
 python -m pip install -e .
-python -m unittest discover -s tests -v
+python -m pytest tests qrk_analysis/tests -q
 ```
 
-## Packages
+Python 3.10 or newer is required.
 
-- `qrk_analysis`: canonical theory, numerical integration, feasibility checks,
-  slack searches, and the integer `smallest_D` API.
-- `experiments.heatmaps`: simulation kernels, theoretical model selection,
-  multiprocessing generation, and stable text output.
-- `qrk_adv`: deprecated compatibility imports. It contains no numerical
-  implementation and will be removed after callers migrate.
-- `heatmap_data_generation`: compatibility facade for historical experiment
-  imports.
-- `legacy`: archived exploratory scripts; do not build new work on them.
+## Numerical bounds
 
-## Main API
+The public upper-bound API returns the smallest certified integer subsample
+size together with the selected slack parameters and diagnostics:
 
 ```python
 from functools import partial
@@ -57,31 +63,73 @@ result = smallest_D(
 print(result["smallest_D"])
 ```
 
-`smallest_D` returns an integer and the flat diagnostic fields
-`alpha_0`, `alpha_prime`, `c`, `p_l_c`, `p_u`, `failure_prob`, and
-`hit_ceiling`. The compatibility parameter `D_precision` is accepted but does
-not affect the integer bisection.
+The result also contains `alpha_0`, `alpha_prime`, `c`, `p_l_c`, `p_u`,
+`failure_prob`, and `hit_ceiling`. The legacy `D_precision` argument remains
+accepted but does not affect the integer bisection.
 
-## Figures and experiments
+## Paper-bound figures
 
-Regenerate the paper-bound figures from this repository root:
+Regenerate formal paper figures or exploratory Gaussian figures with:
 
 ```bash
 python -m qrk_analysis.programs.demo_paper_bounds --paper --recompute
 python -m qrk_analysis.programs.demo_paper_bounds --extra --recompute
+python -m qrk_analysis.programs.demo_paper_bounds --paper --extra --recompute
 ```
 
-The paper command writes formal PDFs to the parent paper's
-`PR_quantile/figures/` directory and caches curves under
-`figure/paper_bounds/cache/`. Gaussian exploratory output remains under
+With no group flag, the command defaults to `--paper`. Formal PDFs are written
+to the parent paper's `PR_quantile/figures/` directory. Curve caches are kept
+under `figure/paper_bounds/cache/`; Gaussian exploratory results are kept under
 `figure/paper_extra/`.
 
-The existing heatmap drivers remain available:
+## Heatmap experiments
+
+Import simulation and generation functions directly from the public package:
+
+```python
+from experiments.heatmaps import (
+    generate_heat_map_matrix,
+    streaming_subsampled_qRK_step,
+)
+```
+
+The supported experiment drivers are:
 
 ```bash
 python heatmap_generation_D_vs_T_demo.py
 python heatmap_generation_D_vs_beta_demo.py
+python convergence_curves_D_demo.py
 ```
 
-These experiments can be expensive. Reduce horizons, grids, sample counts,
-and worker counts for smoke tests.
+The first two write success matrices and theoretical boundaries to
+`heat_map_raw_data/`; the convergence driver writes plots and `.npz` data to
+`figure/`. Quantile diagnostics are written to `q_e/`.
+
+Plot existing heatmap data separately from generation:
+
+```bash
+python -m heatmap_data_display.plot_heatmaps --list-profiles
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-t-massart
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-t-oblivious
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-beta-massart
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-beta-oblivious
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-beta-massart --d-max 80
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-beta-massart --color-scale threshold --color-center 0.9
+```
+
+Previews are written to `figure/heatmaps/`. An explicit `--paper` is required
+to publish stable PDFs to the paper tree. Profiles always name exact cached
+files; the plotting command never searches for the latest dataset. The
+optional `--d-min` and `--d-max` change only the displayed range and default
+to the full range in the cached data. Color scaling defaults to `linear`;
+`--color-scale threshold --color-center 0.9` expands the color range near the
+90% success threshold, while `--color-scale power --color-gamma 2` provides a
+smooth power-law alternative.
+
+[`docs/Experiment_setting.md`](docs/Experiment_setting.md) records the intended paper
+heatmap configuration. Individual demos may temporarily use smaller grids,
+horizons, or sample counts for exploration. The numerical comparison made
+during the package merge is retained in [`docs/merge_audit.md`](docs/merge_audit.md).
+
+Full heatmap sweeps and oblivious-noise bounds can be expensive. Use reduced
+parameters for smoke testing, and preserve cached results for formal settings.

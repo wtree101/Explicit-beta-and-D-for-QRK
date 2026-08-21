@@ -53,6 +53,19 @@ from ..noise.oblivious import (
 )
 
 
+def _total_failure_probability(p_u: float, T: int) -> float:
+    """Evaluate ``1 - (1 - p_u)**T`` without cancellation."""
+    if T <= 0 or p_u <= 0.0:
+        return 0.0
+    if p_u >= 1.0:
+        return 1.0
+    return float(-np.expm1(T * np.log1p(-p_u)))
+
+
+def _failure_budget_satisfied(failure_prob: float, delta_f: float) -> bool:
+    return bool(failure_prob <= delta_f + 1e-12)
+
+
 def find_sigma_with_largest_error_increase_fast(
     qq: float,
     sigma_min: float = 0.01,
@@ -132,9 +145,9 @@ def check_feasibility_conditions(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1 - (1 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    failure_constraint_satisfied = failure_prob <= delta_f
+    failure_constraint_satisfied = _failure_budget_satisfied(failure_prob, delta_f)
     if enforce_failure_probability and not failure_constraint_satisfied:
         return {
             "feasible": False,
@@ -242,9 +255,9 @@ def check_feasibility_conditions_adversarial_revised(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1.0 - (1.0 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    if failure_prob > delta_f:
+    if not _failure_budget_satisfied(failure_prob, delta_f):
         return {
             "feasible": False,
             "reason": "failure probability too high",
@@ -349,9 +362,9 @@ def check_feasibility_conditions_eps(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1 - (1 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    if failure_prob > delta_f:
+    if not _failure_budget_satisfied(failure_prob, delta_f):
         return {
             "feasible": False,
             "reason": "failure probability too high",
@@ -411,9 +424,9 @@ def check_feasibility_conditions_sign_id_C_eps(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1 - (1 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    if failure_prob > delta_f:
+    if not _failure_budget_satisfied(failure_prob, delta_f):
         return {
             "feasible": False,
             "reason": "failure probability too high",
@@ -476,9 +489,9 @@ def check_feasibility_conditions_random_eps(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1 - (1 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    if failure_prob > delta_f:
+    if not _failure_budget_satisfied(failure_prob, delta_f):
         return {
             "feasible": False,
             "reason": "failure probability too high",
@@ -539,9 +552,9 @@ def check_feasibility_conditions_sign_id(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1 - (1 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    if failure_prob > delta_f:
+    if not _failure_budget_satisfied(failure_prob, delta_f):
         return {
             "feasible": False,
             "reason": "failure probability too high",
@@ -601,9 +614,9 @@ def check_feasibility_conditions_sign_id_C(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1 - (1 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    if failure_prob > delta_f:
+    if not _failure_budget_satisfied(failure_prob, delta_f):
         return {
             "feasible": False,
             "reason": "failure probability too high",
@@ -706,9 +719,9 @@ def check_feasibility_conditions_sign_id_C_revised(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1.0 - (1.0 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    if failure_prob > delta_f:
+    if not _failure_budget_satisfied(failure_prob, delta_f):
         return {
             "feasible": False,
             "reason": "failure probability too high",
@@ -835,9 +848,9 @@ def check_feasibility_conditions_C_sup_revised(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1.0 - (1.0 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    failure_constraint_satisfied = failure_prob <= delta_f
+    failure_constraint_satisfied = _failure_budget_satisfied(failure_prob, delta_f)
     if enforce_failure_probability and not failure_constraint_satisfied:
         return {
             "feasible": False,
@@ -947,9 +960,9 @@ def check_feasibility_conditions_random_sup_revised(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1.0 - (1.0 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    failure_constraint_satisfied = failure_prob <= delta_f
+    failure_constraint_satisfied = _failure_budget_satisfied(failure_prob, delta_f)
     if enforce_failure_probability and not failure_constraint_satisfied:
         return {
             "feasible": False,
@@ -1033,9 +1046,9 @@ def check_feasibility_conditions_random(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1 - (1 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    if failure_prob > delta_f:
+    if not _failure_budget_satisfied(failure_prob, delta_f):
         return {
             "feasible": False,
             "reason": "failure probability too high",
@@ -1132,9 +1145,9 @@ def check_feasibility_conditions_random_revised(
         p_u = 0.0
     else:
         p_u = beta * np.exp(-DKL(1 - q, beta + alpha_prime) * D)
-    failure_prob = 1.0 - (1.0 - p_u) ** T
+    failure_prob = _total_failure_probability(p_u, T)
 
-    if failure_prob > delta_f:
+    if not _failure_budget_satisfied(failure_prob, delta_f):
         return {
             "feasible": False,
             "reason": "failure probability too high",

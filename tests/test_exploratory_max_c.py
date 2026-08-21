@@ -2,8 +2,8 @@ import unittest
 
 import numpy as np
 
-from qrk_adv.feasibility import check_feasibility
-from qrk_adv.search import find_max_c_without_failure_constraint
+from qrk_analysis.feasibility.check import check_feasibility
+from qrk_analysis.feasibility.search import find_max_c_without_failure_constraint
 
 
 def fake_feasibility(

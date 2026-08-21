@@ -40,8 +40,13 @@ For `q=0.75`, `beta=0.01`, `T=20000`, `delta_f=0.1`, and `c=0`:
 The canonical implementation uses strict-interior bisection and integer search
 in `D`. Paper figures and prose are regenerated from this implementation.
 
-## Compatibility decision
+## Compatibility removal
 
-`qrk_adv` remains importable but contains forwarding modules only. The heatmap
-drivers intentionally continue importing `qrk_adv` in this migration so their
-call addresses do not change yet.
+The temporary `qrk_adv` forwarding package was removed after all maintained
+callers migrated to direct `qrk_analysis` imports. The historical comparison
+above retains the old package names to document the pre-merge audit.
+
+The temporary `heatmap_data_generation` facade was likewise removed after the
+heatmap drivers and tests migrated to the canonical `experiments.heatmaps`
+API. Neither numerical theory nor simulation now has a top-level forwarding
+package.

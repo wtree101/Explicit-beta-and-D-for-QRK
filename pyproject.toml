@@ -19,4 +19,4 @@ dev = ["pytest"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["qrk_analysis*", "qrk_adv*", "experiments*", "heatmap_data_generation*"]
+include = ["qrk_analysis*", "experiments*", "heatmap_data_display*"]

@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-from qrk_adv.upper_bound import smallest_D
+from qrk_analysis.upper_bound import smallest_continuous_D
 
 from .io import save_heat_map_matrix
 from .simulation import (
@@ -139,13 +139,15 @@ def generate_heat_map_matrix(
             save_heat_map_matrix(data_type="", mean_success=mean_success, **common)
             D_min_values = np.zeros(T_max // T_intervals)
             for index in tqdm(range(T_max // T_intervals)):
-                result = smallest_D(
+                result = smallest_continuous_D(
                     beta,
                     (index + 1) * T_intervals,
                     q,
                     D_max=D_max,
                     delta_f=delta_f,
                     c_target=c,
+                    D_precision=0.05,
+                    num_grid=200,
                     feasibility_check=feasibility_check,
                 )
                 D_min_values[index] = result["smallest_D"]
@@ -206,13 +208,15 @@ def generate_heat_map_matrix(
             save_heat_map_matrix(data_type="", mean_success=mean_success, **common)
             D_min_values = np.zeros(len(beta_values))
             for index, beta_value in enumerate(tqdm(beta_values)):
-                result = smallest_D(
+                result = smallest_continuous_D(
                     beta_value,
                     T_max,
                     q,
                     D_max=D_max,
                     delta_f=delta_f,
                     c_target=c,
+                    D_precision=0.05,
+                    num_grid=200,
                     feasibility_check=feasibility_check,
                 )
                 D_min_values[index] = result["smallest_D"]

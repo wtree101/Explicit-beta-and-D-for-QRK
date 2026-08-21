@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import partial
 
-from qrk_adv.feasibility import (
+from qrk_analysis.feasibility.check import (
     check_feasibility_conditions_C_sup_revised,
     check_feasibility_conditions_random_sup_revised,
 )

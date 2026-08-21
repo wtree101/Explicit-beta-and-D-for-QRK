@@ -61,8 +61,6 @@ def save_heat_map_matrix(
 
     output_path = output_directory / filename
     matrix = np.atleast_2d(np.asarray(mean_success))
-    with output_path.open("wb") as handle:
-        for row in matrix:
-            np.savetxt(handle, np.atleast_1d(row), fmt="%.8f")
+    np.savetxt(output_path, matrix, fmt="%.8f")
     if data_type == "":
         print(f"Filename: ./{output_path}\n")

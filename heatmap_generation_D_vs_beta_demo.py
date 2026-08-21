@@ -1,4 +1,4 @@
-from heatmap_data_generation.heatmapDataGeneration import generate_heat_map_matrix
+from experiments.heatmaps import generate_heat_map_matrix
 import numpy as np
 
 if __name__ == '__main__':

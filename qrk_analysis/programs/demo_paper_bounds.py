@@ -273,6 +273,8 @@ def generate_paper_figures(*, recompute: bool) -> None:
         data_dir=PAPER_DATA_DIR,
         recompute=recompute,
     )
+    massart_peak_index = int(np.nanargmax(beta_massart))
+    massart_peak_q = float(q_massart[massart_peak_index])
 
     save_curve(
         q_massart,
@@ -282,7 +284,7 @@ def generate_paper_figures(*, recompute: bool) -> None:
         color=MASSART_COLOR,
         xlabel=r"Quantile parameter $q$",
         ylabel=r"Maximum corruption $\beta^*(q)$",
-        highlight_x=COMPARISON_Q,
+        highlight_x=massart_peak_q,
         annotation_offset=(-22, -22),
     )
     save_curve(

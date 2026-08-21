@@ -3,10 +3,8 @@ from functools import partial
 
 import numpy as np
 
-import qrk_adv.feasibility as compatibility_feasibility
-import qrk_adv.upper_bound as compatibility_upper_bound
 from experiments import heatmaps
-from heatmap_data_generation import heatmapDataGeneration as legacy_heatmaps
+from experiments.heatmaps import generation, simulation
 from qrk_analysis.core.divergence import DKL
 from qrk_analysis.core.quantile import sigma_min_alpha0_square
 from qrk_analysis.feasibility.check import (
@@ -18,7 +16,7 @@ from qrk_analysis.noise.oblivious import (
     error_increased_Gaussian_noise,
     error_increased_Gaussian_noise_batch,
 )
-from qrk_analysis.upper_bound import smallest_D
+from qrk_analysis.upper_bound import smallest_D, smallest_continuous_D
 
 
 class CanonicalFormulaTests(unittest.TestCase):
@@ -131,22 +129,33 @@ class IntegerSearchTests(unittest.TestCase):
         self.assertTrue(exhausted["search_exhausted"])
 
 
-class CompatibilityTests(unittest.TestCase):
-    def test_qrk_adv_forwards_to_canonical_objects(self):
-        self.assertIs(
-            compatibility_feasibility.check_feasibility,
-            check_feasibility_conditions,
+class ContinuousSearchTests(unittest.TestCase):
+    def test_continuous_threshold_relaxes_integer_search(self):
+        continuous = smallest_continuous_D(
+            0.01,
+            20_000,
+            0.75,
+            0.1,
+            D_max=500,
+            D_precision=0.01,
+            num_grid=50,
         )
-        self.assertIs(compatibility_upper_bound.smallest_D, smallest_D)
+        integer = smallest_D(0.01, 20_000, 0.75, 0.1, D_max=500, num_grid=50)
 
-    def test_heatmap_facade_forwards_to_reorganized_package(self):
+        self.assertIsInstance(continuous["smallest_D"], float)
+        self.assertEqual(np.ceil(continuous["smallest_D"]), integer["smallest_D"])
+        self.assertLessEqual(continuous["smallest_D"], integer["smallest_D"])
+
+
+class HeatmapPublicApiTests(unittest.TestCase):
+    def test_public_exports_reference_canonical_implementations(self):
         self.assertIs(
-            legacy_heatmaps.streaming_subsampled_qRK_step,
             heatmaps.streaming_subsampled_qRK_step,
+            simulation.streaming_subsampled_qRK_step,
         )
         self.assertIs(
-            legacy_heatmaps.generate_heat_map_matrix,
             heatmaps.generate_heat_map_matrix,
+            generation.generate_heat_map_matrix,
         )
 
 
