@@ -16,4 +16,4 @@ dist/
 *.egg-info/
 .pytest_cache/
 run_codes_on_server/
-run_codes_on_server/
+.venv*/
