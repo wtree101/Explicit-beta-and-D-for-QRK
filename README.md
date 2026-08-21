@@ -105,6 +105,12 @@ The first two write success matrices and theoretical boundaries to
 `heat_map_raw_data/`; the convergence driver writes plots and `.npz` data to
 `figure/`. Quantile diagnostics are written to `q_e/`.
 
+Heatmap generation uses two independent contraction parameters:
+`c_success` defines the empirical success criterion
+`relative_error <= (1 - c_success / n) ** T`, and `c_theory` is passed as the
+contraction target when computing the theoretical boundary. Generated data
+filenames record both values.
+
 Plot existing heatmap data separately from generation:
 
 ```bash

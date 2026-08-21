@@ -44,8 +44,9 @@ if __name__ == '__main__':
     num_workers = 8
     corruption_type = "sup_c"  # "sup_c" / "oblivious_large" / "adversarial"
 
-    # Min D parameters
-    c = 0.05
+    # Empirical success criterion and theoretical contraction target.
+    c_success = 0.05
+    c_theory = 0.05
 
     generate_heat_map_matrix(
         D_vs_TYPE="D_vs_T",
@@ -55,7 +56,8 @@ if __name__ == '__main__':
         x=x,
         q=q,
         n=n,
-        c=c,
+        c_success=c_success,
+        c_theory=c_theory,
         corruption_type=corruption_type,
         beta=beta,
         T_intervals=T_intervals,

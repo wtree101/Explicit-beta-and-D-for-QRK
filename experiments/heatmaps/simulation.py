@@ -127,7 +127,7 @@ def run_qRK_subsample_D_vs_beta(
     q: float,
     beta: float,
     n: int,
-    c: float,
+    c_success: float,
     corruption_type: str,
     c_min: float,
     c_max: float,
@@ -161,7 +161,7 @@ def run_qRK_subsample_D_vs_beta(
             update_noise_max=update_noise_max,
         )
     relative_error = np.linalg.norm(xk - x) ** 2 / np.linalg.norm(x) ** 2
-    return bool(relative_error < (1.0 - c / n) ** T_max)
+    return bool(relative_error <= (1.0 - c_success / n) ** T_max)
 
 
 def run_qRK_subsample_D_vs_T(
@@ -172,7 +172,7 @@ def run_qRK_subsample_D_vs_T(
     q: float,
     beta: float,
     n: int,
-    c: float,
+    c_success: float,
     corruption_type: str,
     c_min: float,
     c_max: float,
@@ -211,5 +211,5 @@ def run_qRK_subsample_D_vs_T(
             continue
         index = iteration // T_intervals - 1
         relative_error = np.linalg.norm(xk - x) ** 2 / np.linalg.norm(x) ** 2
-        successes[index] = relative_error <= (1.0 - c / n) ** iteration
+        successes[index] = relative_error <= (1.0 - c_success / n) ** iteration
     return successes, quantile_fraction

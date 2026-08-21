@@ -31,8 +31,11 @@ quantile points. Gaussian exploration uses `sigma in [0.01,10]` with 20 points.
 - `smallest_D` returns an integer and a flat diagnostic result.
 - Revised oblivious checks use the scaled quantile interval required by the
   paper and the same scaled lower endpoint in the failure penalty.
-- Heatmap success remains
-  `squared_relative_error <= (1 - c / n) ** T` using the preset `c`.
+- Heatmap generation keeps `c_success` and `c_theory` independent.
+  `c_success` defines
+  `squared_relative_error <= (1 - c_success / n) ** T`; `c_theory` is the
+  contraction target for the theoretical boundary. Preserve both values in
+  generated filenames.
 - Preserve heatmap corruption types, filenames, matrix orientation, worker
   cap, and independent finite intervals for `oblivious_large`.
 

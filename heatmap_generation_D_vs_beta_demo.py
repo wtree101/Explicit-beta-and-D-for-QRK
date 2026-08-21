@@ -31,8 +31,9 @@ if __name__ == '__main__':
     # Sampling Parameters
     num_samples = 100
 
-    # Success-quantification parameters
-    c = 0.01
+    # Empirical success criterion and theoretical contraction target.
+    c_success = 0.01
+    c_theory = 0.01
 
     generate_heat_map_matrix(
         D_vs_TYPE="D_vs_beta",
@@ -42,7 +43,8 @@ if __name__ == '__main__':
         x=x,
         q=q,
         n=n,
-        c=c,
+        c_success=c_success,
+        c_theory=c_theory,
         corruption_type=corruption_type,
         beta_samples=beta_samples,
         c_min=c_min,

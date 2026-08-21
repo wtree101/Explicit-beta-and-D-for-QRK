@@ -17,8 +17,13 @@ T_max = 20_000
 num_samples = 100
 num_workers = 8
 random_seed = 2026
-c = 0.05
+c_success = 0.05
+c_theory = 0.05
 ```
+
+For the current paper heatmaps, both values are `0.01` under Massart noise and
+`0.05` under oblivious noise. They are separate parameters and need not remain
+equal in future experiments.
 
 The normalized true solution is generated reproducibly:
 
