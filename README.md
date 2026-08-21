@@ -1,293 +1,141 @@
-# Explicit beta and D in QRK
+# Streaming QRK analysis and experiments
 
-Minimal self-contained code (`adv_D_upper`) for computing the **upper bound on
-the subsample size D** in Quantile-based Randomized Kaczmarz (QRK) under
-**adversarial Massart noise**, **fixed noise (supremum over C)**, and
-**Gaussian oblivious noise (supremum over σ)**.
+This repository contains the canonical numerical theory and Monte Carlo
+experiments for the paper on quantile randomized Kaczmarz (QRK) for streaming
+corrupted linear systems.
 
----
+The maintained Python packages are:
 
-## Background
+- `qrk_analysis`: produces theoretical curves. Includes quantiles, noise models, feasibility checks, parameter
+  searches, and the integer `smallest_D` API.
+- `experiments.heatmaps`: produces practical results through streaming
+  simulations, heatmap generation, theoretical model selection, and stable
+  text output.
+- `heatmap_data_display`: renders explicitly selected cached heatmap data
+  without rerunning simulations.
 
-QRK solves a corrupted linear system Ax* + ε = b where ε is (βm)-sparse.
-At each iteration it computes a q-quantile of the residual using a subsample
-of D rows.  Our theory (preliminary result) shows that QRK linearly converges
-over T iterations with high probability provided
+Archived exploratory programs live in `legacy/` and are not part of the
+supported API.
 
-```
-D ≥ C · log(T) / log(1/β)
-```
+## Setup and verification
 
-for some absolute constant C.  This code numerically finds the **smallest D**
-satisfying the full set of feasibility conditions for given (β, T, q, δ_f).
-
----
-
-## Package layout
-
-```
-adv_D_upper/
-├── qrk_adv/
-│   ├── divergence.py    # DKL(q || p) for Bernoulli distributions
-│   ├── quantile.py      # half-normal quantile, sigma_min^2 lower bound
-│   ├── noise.py         # fixed/Gaussian noise error increase utilities
-│   ├── feasibility.py   # feasibility conditions (adversarial + variants)
-│   ├── search.py        # find feasible (alpha_0, alpha') at fixed D
-│   └── upper_bound.py   # binary search for smallest_D  ← main entry point
-├── demo.py              # single example + sweep plot (adversarial by default)
-├── requirements.txt
-└── README.md
-```
-
----
-
-## Quick start
+Run from this directory in the Conda base environment:
 
 ```bash
-cd adv_D_upper
-pip install -r requirements.txt
-python demo.py
+conda activate base
+python -m pip install -e .
+python -m pytest tests qrk_analysis/tests -q
 ```
 
-This prints the smallest D for a single example and saves
-`figure/demo_D_vs_beta.png` showing D vs beta.
+Python 3.10 or newer is required.
 
-## Demo figure
+## Numerical bounds
 
-![Upper bound on D vs beta](figure/demo_D_vs_beta.png)
-
----
-
-## Main API
+The public upper-bound API returns the smallest certified integer subsample
+size together with the selected slack parameters and diagnostics:
 
 ```python
-from qrk_adv.upper_bound import smallest_D
 from functools import partial
-from qrk_adv.feasibility import check_feasibility_conditions_random_sup_revised
 
-result = smallest_D(
-    beta    = 0.05,    # corruption fraction
-    T       = 20_000,  # number of iterations
-    q       = 0.75,    # quantile level
-    delta_f = 0.1,     # total failure probability budget
-    D_max   = 500,     # search ceiling (raise if result hits it)
-  c_target = 0.0,
-    feasibility_check = None,  # defaults to adversarial check
+from qrk_analysis.feasibility.check import (
+    check_feasibility_conditions_C_sup_revised,
 )
+from qrk_analysis.upper_bound import smallest_D
 
-print(result["smallest_D"])   # smallest feasible D
-print(result["c"])             # net contraction coefficient c
-print(result["failure_prob"])  # actual failure probability
-```
-
-To use the Gaussian worst-sigma check with explicit grid sizes:
-
-```python
-from qrk_adv.feasibility import check_feasibility_conditions_random_sup_revised
-
-gaussian_check = partial(
-  check_feasibility_conditions_random_sup_revised,
-  num_grid_Q=20,
-  num_points_C=50,
+fixed_supremum = partial(
+    check_feasibility_conditions_C_sup_revised,
+    num_grid_Q=10,
+    C_min=0.0,
+    C_max=20.0,
+    num_points_C=200,
 )
 
 result = smallest_D(
-  beta=0.05,
-  T=20_000,
-  q=0.75,
-  delta_f=0.1,
-  D_max=500,
-  c_target=0.0,
-  feasibility_check=gaussian_check,
+    beta=0.01,
+    T=20_000,
+    q=0.75,
+    delta_f=0.1,
+    D_max=1_000,
+    c_target=0.0,
+    num_grid=60,
+    feasibility_check=fixed_supremum,
 )
+print(result["smallest_D"])
 ```
 
-To use the **fixed-noise supremum-over-C** check (oblivious worst-case magnitude):
+The result also contains `alpha_0`, `alpha_prime`, `c`, `p_l_c`, `p_u`,
+`failure_prob`, and `hit_ceiling`. The legacy `D_precision` argument remains
+accepted but does not affect the integer bisection.
 
-```python
-from qrk_adv.feasibility import check_feasibility_conditions_C_sup_revised
+## Paper-bound figures
 
-fixed_C_check = partial(
-  check_feasibility_conditions_C_sup_revised,
-  num_grid_Q=2,       # Q_{q,k+1} sweep; 1 often suffices if c increases in q
-  C_min=0.0,
-  C_max=20.0,
-  num_points_C=20,    # grid for sup_C error_increased_C_3
-)
-
-result = smallest_D(
-  beta=0.05,
-  T=20_000,
-  q=0.75,
-  delta_f=0.1,
-  D_max=500,
-  c_target=0.0,
-  feasibility_check=fixed_C_check,
-)
-
-# Revised checks return c_min (not c); smallest_D maps it to result["c"].
-print(result["c"], result.get("smallest_D"))
-```
-
-### Parameters
-
-| Name        | Type  | Meaning |
-|-------------|-------|---------|
-| `beta`      | float | Corruption fraction beta in (0, q) and (0, 1-q) |
-| `T`         | int   | Number of QRK iterations |
-| `q`         | float | Quantile level, e.g. 0.75 |
-| `delta_f`   | float | Total failure probability budget |
-| `D_max`     | int   | Search ceiling on D (default 500) |
-| `D_precision`| float | Binary-search stopping tolerance (default 1) |
-| `c_target`  | float | Require c ≥ c_target (default 0) |
-| `feasibility_check` | callable | Optional check function (defaults to adversarial) |
-
-### Return value
-
-| Key            | Meaning |
-|----------------|---------|
-| `smallest_D`   | Smallest feasible D (None if infeasible within D_max) |
-| `alpha_0`      | Optimal lower slack parameter |
-| `alpha_prime`  | Optimal upper slack parameter |
-| `c`            | Net contraction at optimum (`c` or `c_min` from the check) |
-| `failure_prob` | Actual failure probability 1 - (1-p_u)^T |
-| `hit_ceiling`  | True if result == D_max (increase D_max) |
-
----
-
-## Feasibility conditions for adversarial case
-
-The two conditions verified at each candidate D are:
-
-1. **Net contraction** (c > 0):  
-   `p_l_c = 1 - exp(-DKL(q, β+α₀) · D)`
-   `Φ = half_normal_quantile(1 - α'/(1-β))`
-   `c = (1-β)·p_l_c·σ_min²(α₀/(1-β)) - β·(Φ² + 2Φ·E|Z|) ≥ c_target`  
-
-2. **Failure probability**:  
-   `1 - (1 - β·exp(-DKL(1-q, β+α')·D))^T ≤ δ_f`
-
----
-
-## Feasibility checks in `qrk_adv.feasibility`
-
-| Function | Noise model |
-|----------|-------------|
-| `check_feasibility` | Adversarial Massart (preliminary) |
-| `check_feasibility_conditions_C_sup_revised` | Fixed magnitude C; sup over `[C_min, C_max]` at each conditional quantile |
-| `check_feasibility_conditions_random_sup_revised` | Gaussian C ~ N(0, σ²); sup over `[sigma_min, sigma_max]` |
-
-Custom checks used by exploratory diagnostic searches must accept
-`(T, beta, D, q, alpha_0, alpha_prime, delta_f, c_target=...,
-*, enforce_failure_probability=True)`. They must return a dict containing
-`feasible`, `failure_prob`, and either `c` or `c_min`. When
-`enforce_failure_probability=False`, the check should still report the failure
-probability but must not reject an otherwise valid contraction candidate because
-it exceeds `delta_f`.
-
-## Heatmap `corruption_type` values
-
-The heatmap demo scripts use a string-valued `corruption_type` to select the
-simulation noise model and the matching feasibility check:
-
-| `corruption_type` | Meaning |
-|-------------------|---------|
-| `"adversarial"` | Adversarial Massart-style corruption |
-| `"oblivious_large"` | Bernoulli corruption with separate large finite simulation noises for the quantile sample and candidate update |
-| `"sup_c"` | Simulation noise sampled uniformly from `c_min <= epsilon <= c_max` |
-| `"sup_rand"` | Gaussian oblivious noise; supremum over sigma |
-
-So for the fixed-noise case, set:
-
-```python
-corruption_type = "sup_c"
-```
-
-Do not use `"fixed"` unless the code is extended to recognize it as an alias.
-
-For the fixed-reference convergence experiment, `"oblivious_large"`
-independently samples the noise on each corrupted quantile-reference row from
-`Uniform(quantile_noise_min, quantile_noise_max)` and independently samples the
-corrupted candidate-row noise from
-`Uniform(update_noise_min, update_noise_max)`. The defaults
-`quantile_noise_min=quantile_noise_max=1e16` and
-`update_noise_min=update_noise_max=1e8` reproduce the previous deterministic
-large-noise behavior. Either interval can instead be set to `[-1000, 1000]` to
-use uniform oblivious noise for that role. All values are finite on purpose:
-IEEE infinity could make quantile interpolation or an accepted update produce
-`NaN`/`inf`. The corruption indicators remain Bernoulli with rate `beta`.
-
-The simulation noise parameters are separate from the numerical parameters used
-to compute the theoretical `D_min`. Both `"sup_c"` and `"oblivious_large"` use
-the fixed-C supremum feasibility check with, by default,
-
-```python
-feasibility_C_min = 0
-feasibility_C_max = 100
-```
-
-This interval approximates a supremum over an unknown oblivious noise magnitude;
-it is not inferred from `c_min`, `c_max`, or either simulation-noise interval.
-The default grid currently uses 20 points, which can be increased in
-`make_feasibility_check` when a finer numerical supremum is needed.
-
-## Heatmap success criterion
-
-The heatmap generator uses the same preset `c` for every heatmap cell. A run
-is counted as successful when
-
-```text
-squared_relative_error <= (1 - c / n)^T
-```
-
-This is a uniform and directly comparable experimental threshold across all
-cells. The preset `c` is not claimed to estimate the experiment's actual
-contraction rate. The former `c_bound` success mode was removed because the
-bound-derived value did not accurately represent that empirical rate.
-
-The separately generated `D_min` curve is different: it still uses the full
-theoretical feasibility and failure-probability constraints, with the preset
-`c` as `c_target`, and retains its theoretical meaning.
-
-`find_max_c_without_failure_constraint` remains available only for historical
-or exploratory diagnostics. Its output must not be used as a heatmap success
-criterion. Historical `c_bound` display material is kept under
-`heatmap_data_display/archive/` and new heatmap runs do not generate those
-matrices or filename suffixes.
-
-## Convergence curves at fixed T
-
-`convergence_curves_D_demo.py` compares full convergence trajectories for a
-list of D values at one fixed time horizon. Its default configuration uses
-`corruption_type="oblivious_large"`, `D=1,...,10`, and 5 independent trials:
+Regenerate formal paper figures or exploratory Gaussian figures with:
 
 ```bash
-python3 convergence_curves_D_demo.py
+python -m qrk_analysis.programs.demo_paper_bounds --paper --recompute
+python -m qrk_analysis.programs.demo_paper_bounds --extra --recompute
+python -m qrk_analysis.programs.demo_paper_bounds --paper --extra --recompute
 ```
 
-For every D, the figure shows the mean squared relative error as a solid line,
-a 10%-90% trial band, and `(1-c/n)^t` using the preset fixed `c` as a
-black dashed reference. This dashed curve is a fixed success reference,
-not an estimate of the actual contraction rate. The script saves both a PNG
-and the complete trial data as an NPZ file under `figure/`.
+With no group flag, the command defaults to `--paper`. Formal PDFs are written
+to the parent paper's `PR_quantile/figures/` directory. Curve caches are kept
+under `figure/paper_bounds/cache/`; Gaussian exploratory results are kept under
+`figure/paper_extra/`.
 
-Edit `ExperimentConfig` near the top of the script to change `T`, `D_list`,
-`num_trials`, `record_every`, `fixed_c`, or the noise model. The full curves
-should be used to compare empirical rates across D; the binary success
-criterion intentionally remains uniform and simple.
+## Heatmap experiments
 
----
+Import simulation and generation functions directly from the public package:
 
-## Notes
+```python
+from experiments.heatmaps import (
+    generate_heat_map_matrix,
+    streaming_subsampled_qRK_step,
+)
+```
 
-- The default feasibility check is the preliminary adversarial analysis.
-  Pass a custom check via `feasibility_check` (typically `functools.partial`)
-  for the fixed-C or Gaussian supremum variants in `qrk_adv.feasibility`.
-- Feasibility requires `β < min(q, 1-q)`.  Near this boundary D grows
-  rapidly; increase `D_max` as needed.
-- The `c_target` parameter can be used to study robustness: a larger
-  c_target forces a faster convergence rate but raises the required D.
+The supported experiment drivers are:
 
-## Additional demos
-- `demo.py` supports a `FEASIBILITY_CHECK` variable and a `VERBOSE` flag
-  for printing sweep progress.
+```bash
+python heatmap_generation_D_vs_T_demo.py
+python heatmap_generation_D_vs_beta_demo.py
+python convergence_curves_D_demo.py
+```
+
+The first two write success matrices and theoretical boundaries to
+`heat_map_raw_data/`; the convergence driver writes plots and `.npz` data to
+`figure/`. Quantile diagnostics are written to `q_e/`.
+
+Heatmap generation uses two independent contraction parameters:
+`c_success` defines the empirical success criterion
+`relative_error <= (1 - c_success / n) ** T`, and `c_theory` is passed as the
+contraction target when computing the theoretical boundary. Generated data
+filenames record both values.
+
+Plot existing heatmap data separately from generation:
+
+```bash
+python -m heatmap_data_display.plot_heatmaps --list-profiles
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-t-massart
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-t-oblivious
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-beta-massart
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-beta-oblivious
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-beta-massart --d-max 80
+python -m heatmap_data_display.plot_heatmaps --profile d-vs-beta-massart --color-scale threshold --color-center 0.9
+```
+
+Previews are written to `figure/heatmaps/`. An explicit `--paper` is required
+to publish stable PDFs to the paper tree. Profiles always name exact cached
+files; the plotting command never searches for the latest dataset. The
+optional `--d-min` and `--d-max` change only the displayed range and default
+to the full range in the cached data. Color scaling defaults to `linear`;
+`--color-scale threshold --color-center 0.9` expands the color range near the
+90% success threshold, while `--color-scale power --color-gamma 2` provides a
+smooth power-law alternative.
+
+[`docs/Experiment_setting.md`](docs/Experiment_setting.md) records the intended paper
+heatmap configuration. Individual demos may temporarily use smaller grids,
+horizons, or sample counts for exploration. The numerical comparison made
+during the package merge is retained in [`docs/merge_audit.md`](docs/merge_audit.md).
+
+Full heatmap sweeps and oblivious-noise bounds can be expensive. Use reduced
+parameters for smoke testing, and preserve cached results for formal settings.

@@ -3,7 +3,7 @@ from unittest.mock import call, patch
 
 import numpy as np
 
-from heatmap_data_generation.heatmapDataGeneration import (
+from experiments.heatmaps import (
     streaming_subsampled_qRK_step,
 )
 

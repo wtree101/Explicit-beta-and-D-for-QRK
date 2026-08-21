@@ -1,4 +1,4 @@
-from heatmap_data_generation.heatmapDataGeneration import generate_heat_map_matrix
+from experiments.heatmaps import generate_heat_map_matrix
 import numpy as np
 
 if __name__ == '__main__':
@@ -35,17 +35,18 @@ if __name__ == '__main__':
     q = 0.8
     beta = 0.01
     D_sample_sizes = (np.arange(30))+1
-    T_intervals = 100
-    T_max = 20_000
+    T_intervals = 1000
+    T_max = 10_000
 
     # Sampling Parameters
-    num_samples = 100
+    num_samples = 10
     # None uses min(num_samples, available CPU cores).
     num_workers = 8
-    corruption_type = "adversarial"  # "sup_c" / "oblivious_large" / "adversarial"
+    corruption_type = "sup_c"  # "sup_c" / "oblivious_large" / "adversarial"
 
-    # Min D parameters
-    c = 0.01
+    # Empirical success criterion and theoretical contraction target.
+    c_success = 0.05
+    c_theory = 0.05
 
     generate_heat_map_matrix(
         D_vs_TYPE="D_vs_T",
@@ -55,7 +56,8 @@ if __name__ == '__main__':
         x=x,
         q=q,
         n=n,
-        c=c,
+        c_success=c_success,
+        c_theory=c_theory,
         corruption_type=corruption_type,
         beta=beta,
         T_intervals=T_intervals,

@@ -1,3 +1,0 @@
-# Keep directory for raw data storage, but force raw data to only be stored locally
-*
-!.gitignore

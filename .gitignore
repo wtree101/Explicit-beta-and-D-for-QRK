@@ -9,4 +9,11 @@ find_D_min_D_vs_T.py
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Python build and test artifacts
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+run_codes_on_server/
 run_codes_on_server/

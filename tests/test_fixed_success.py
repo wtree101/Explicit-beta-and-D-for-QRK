@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from heatmap_data_generation.heatmapDataGeneration import (
+from experiments.heatmaps import (
     generate_heat_map_matrix,
     make_feasibility_check,
     run_qRK_subsample_D_vs_beta,
@@ -27,15 +27,17 @@ class FixedSuccessCriterionTests(unittest.TestCase):
         self.assertEqual(feasibility_check.keywords["C_min"], 0.0)
         self.assertEqual(feasibility_check.keywords["C_max"], 100.0)
 
-    def test_generator_has_no_c_success_mode(self):
+    def test_generator_exposes_independent_c_values(self):
         parameters = inspect.signature(generate_heat_map_matrix).parameters
 
-        self.assertNotIn("c_success_mode", parameters)
+        self.assertIn("c_success", parameters)
+        self.assertIn("c_theory", parameters)
+        self.assertNotIn("c", parameters)
 
-    @patch("heatmap_data_generation.heatmapDataGeneration.os.cpu_count")
-    @patch("heatmap_data_generation.heatmapDataGeneration.smallest_D")
-    @patch("heatmap_data_generation.heatmapDataGeneration.save_heat_map_matrix")
-    @patch("heatmap_data_generation.heatmapDataGeneration.Pool")
+    @patch("experiments.heatmaps.generation.os.cpu_count")
+    @patch("experiments.heatmaps.generation.smallest_continuous_D")
+    @patch("experiments.heatmaps.generation.save_heat_map_matrix")
+    @patch("experiments.heatmaps.generation.Pool")
     def test_worker_count_is_limited_by_num_samples(
         self,
         mock_pool,
@@ -64,7 +66,8 @@ class FixedSuccessCriterionTests(unittest.TestCase):
                     x=np.ones(1),
                     q=0.8,
                     n=1,
-                    c=0.1,
+                    c_success=0.1,
+                    c_theory=0.2,
                     corruption_type="adversarial",
                     beta=0.1,
                     random_seed=123,
@@ -79,10 +82,10 @@ class FixedSuccessCriterionTests(unittest.TestCase):
         mock_pool.return_value.join.assert_called_once_with()
 
     @patch(
-        "heatmap_data_generation.heatmapDataGeneration."
+        "experiments.heatmaps.simulation."
         "streaming_subsampled_qRK_step"
     )
-    def test_D_vs_beta_uses_preset_c(self, mock_step):
+    def test_D_vs_beta_uses_c_success(self, mock_step):
         mock_step.return_value = (np.array([1.0 - np.sqrt(0.5)]), 0.8)
         common = dict(
             D=1,
@@ -98,14 +101,14 @@ class FixedSuccessCriterionTests(unittest.TestCase):
             s_max=1.0,
         )
 
-        self.assertTrue(run_qRK_subsample_D_vs_beta(c=0.4, **common))
-        self.assertFalse(run_qRK_subsample_D_vs_beta(c=0.6, **common))
+        self.assertTrue(run_qRK_subsample_D_vs_beta(c_success=0.4, **common))
+        self.assertFalse(run_qRK_subsample_D_vs_beta(c_success=0.6, **common))
 
     @patch(
-        "heatmap_data_generation.heatmapDataGeneration."
+        "experiments.heatmaps.simulation."
         "streaming_subsampled_qRK_step"
     )
-    def test_D_vs_T_uses_preset_c_at_each_time(self, mock_step):
+    def test_D_vs_T_uses_c_success_at_each_time(self, mock_step):
         mock_step.return_value = (np.array([1.0 - np.sqrt(0.5)]), 0.8)
         common = dict(
             D=1,
@@ -122,11 +125,11 @@ class FixedSuccessCriterionTests(unittest.TestCase):
             s_max=1.0,
         )
 
-        successes, _ = run_qRK_subsample_D_vs_T(c=0.4, **common)
+        successes, _ = run_qRK_subsample_D_vs_T(c_success=0.4, **common)
 
         np.testing.assert_array_equal(successes, np.array([1.0, 0.0]))
 
-    def test_saved_filename_has_no_bound_suffix(self):
+    def test_saved_filename_records_both_c_values(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             working_directory = Path.cwd()
             try:
@@ -142,7 +145,8 @@ class FixedSuccessCriterionTests(unittest.TestCase):
                     num_samples=1,
                     T_max=1,
                     q=0.8,
-                    c=0.1,
+                    c_success=0.1,
+                    c_theory=0.2,
                     corruption_type="adversarial",
                     beta=0.1,
                     T_intervals=1,
@@ -152,12 +156,43 @@ class FixedSuccessCriterionTests(unittest.TestCase):
                 os.chdir(working_directory)
 
         self.assertEqual(len(filenames), 1)
-        self.assertNotIn("c_bound", filenames[0])
-        self.assertNotIn("c_success", filenames[0])
+        self.assertIn("c_success=1e-01", filenames[0])
+        self.assertIn("c_theory=2e-01", filenames[0])
 
-    @patch("heatmap_data_generation.heatmapDataGeneration.smallest_D")
-    @patch("heatmap_data_generation.heatmapDataGeneration.save_heat_map_matrix")
-    @patch("heatmap_data_generation.heatmapDataGeneration.Pool")
+    def test_saved_heatmap_preserves_matrix_rows(self):
+        expected = np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            working_directory = Path.cwd()
+            try:
+                temporary_path = Path(temporary_directory)
+                os.chdir(temporary_path)
+                save_heat_map_matrix(
+                    D_vs_TYPE="D_vs_T",
+                    data_type="",
+                    mean_success=expected,
+                    n=1,
+                    D_sample_sizes=np.array([1, 2]),
+                    num_samples=1,
+                    T_max=3,
+                    q=0.8,
+                    c_success=0.1,
+                    c_theory=0.2,
+                    corruption_type="adversarial",
+                    beta=0.1,
+                    T_intervals=1,
+                )
+                output_path = next(
+                    (temporary_path / "heat_map_raw_data").iterdir()
+                )
+                actual = np.loadtxt(output_path)
+            finally:
+                os.chdir(working_directory)
+
+        np.testing.assert_array_equal(actual, expected)
+
+    @patch("experiments.heatmaps.generation.smallest_continuous_D")
+    @patch("experiments.heatmaps.generation.save_heat_map_matrix")
+    @patch("experiments.heatmaps.generation.Pool")
     def test_small_D_vs_T_run_has_expected_shapes(
         self,
         mock_pool,
@@ -183,7 +218,8 @@ class FixedSuccessCriterionTests(unittest.TestCase):
                     x=np.ones(1),
                     q=0.8,
                     n=1,
-                    c=0.1,
+                    c_success=0.1,
+                    c_theory=0.2,
                     corruption_type="adversarial",
                     beta=0.1,
                     T_intervals=1,
@@ -194,11 +230,13 @@ class FixedSuccessCriterionTests(unittest.TestCase):
         saved = {call.kwargs["data_type"]: call.kwargs for call in mock_save.call_args_list}
         self.assertEqual(np.asarray(saved[""]["mean_success"]).shape, (2, 2))
         self.assertEqual(np.asarray(saved["D_min"]["mean_success"]).shape, (2, 1))
-        self.assertNotIn("c_success_mode", saved[""])
+        self.assertEqual(saved[""]["c_success"], 0.1)
+        self.assertEqual(saved[""]["c_theory"], 0.2)
+        self.assertEqual(mock_smallest_D.call_args.kwargs["c_target"], 0.2)
 
-    @patch("heatmap_data_generation.heatmapDataGeneration.smallest_D")
-    @patch("heatmap_data_generation.heatmapDataGeneration.save_heat_map_matrix")
-    @patch("heatmap_data_generation.heatmapDataGeneration.Pool")
+    @patch("experiments.heatmaps.generation.smallest_continuous_D")
+    @patch("experiments.heatmaps.generation.save_heat_map_matrix")
+    @patch("experiments.heatmaps.generation.Pool")
     def test_small_D_vs_beta_run_has_expected_shape(
         self,
         mock_pool,
@@ -216,7 +254,8 @@ class FixedSuccessCriterionTests(unittest.TestCase):
             x=np.ones(1),
             q=0.8,
             n=1,
-            c=0.1,
+            c_success=0.1,
+            c_theory=0.2,
             corruption_type="adversarial",
             beta_samples=np.array([0.01, 0.02]),
         )
@@ -226,7 +265,9 @@ class FixedSuccessCriterionTests(unittest.TestCase):
             if call.kwargs["data_type"] == ""
         )
         self.assertEqual(np.asarray(success_call.kwargs["mean_success"]).shape, (2, 2))
-        self.assertNotIn("c_success_mode", success_call.kwargs)
+        self.assertEqual(success_call.kwargs["c_success"], 0.1)
+        self.assertEqual(success_call.kwargs["c_theory"], 0.2)
+        self.assertEqual(mock_smallest_D.call_args.kwargs["c_target"], 0.2)
 
 
 if __name__ == "__main__":
